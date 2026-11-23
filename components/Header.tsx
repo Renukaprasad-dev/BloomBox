@@ -61,19 +61,35 @@ export const Header: React.FC<HeaderProps> = ({ onNavClick }) => {
               Journal
             </a>
           </li>
+          <li>
+            <a
+              href="/bloombox"
+              className="text-[14.5px] font-medium tracking-[0.08em] uppercase text-[#f5efe2] transition-all duration-300 hover:text-white border-b border-[#f5efe2]/40 pb-0.5"
+            >
+              BloomBox
+            </a>
+          </li>
         </ul>
 
-        {/* Pill CTA button */}
-        <a
-          href="#contact"
-          onClick={(e) => {
-            e.preventDefault();
-            onNavClick?.('contact');
-          }}
-          className="inline-flex h-[40px] items-center justify-center rounded-full bg-[#f5efe2] px-6 text-[13px] font-medium uppercase tracking-[0.08em] text-[#151510] transition-all duration-300 hover:bg-white hover:scale-[1.02] active:scale-[0.98] custom:h-[46px] custom:px-7 custom:text-[14px]"
-        >
-          Let&apos;s Talk
-        </a>
+        {/* Pill CTA button & Bloombox link */}
+        <div className="flex items-center gap-3">
+          <a
+            href="/bloombox"
+            className="custom:hidden text-xs font-medium uppercase tracking-[0.08em] text-[#f5efe2]/80 hover:text-white border border-[#f5efe2]/30 px-3 py-1.5 rounded-full"
+          >
+            BloomBox
+          </a>
+          <a
+            href="#contact"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavClick?.('contact');
+            }}
+            className="inline-flex h-[40px] items-center justify-center rounded-full bg-[#f5efe2] px-6 text-[13px] font-medium uppercase tracking-[0.08em] text-[#151510] transition-all duration-300 hover:bg-white hover:scale-[1.02] active:scale-[0.98] custom:h-[46px] custom:px-7 custom:text-[14px]"
+          >
+            Let&apos;s Talk
+          </a>
+        </div>
       </nav>
     </header>
   );
