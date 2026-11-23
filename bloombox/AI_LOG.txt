@@ -1,0 +1,16 @@
+AI_LOG.txt - BloomBox (template, fill in honestly with your own team's notes)
+
+Rule from the problem: write what you asked the AI and what you changed.
+
+1. Asked: Build the full BloomBox project from the Problem 22 PDF (Levels 1 and 2).
+   Got: packages bloombox.app / model / exceptions, all classes, README.
+   We changed: <write what your team changed or renamed>
+
+2. Asked: Run the four test cases.
+   Got: Case 1 = 1785.00, Case 2 = 946.05, Case 3 InsufficientStockException with stock unchanged, Case 4 FlowerItemNotFoundException and program continues.
+   We changed: <...>
+
+3. Things our team can explain without AI (mentor will ask):
+   - <e.g. why stock is reduced only in Order.confirm()>
+   - <e.g. how ItemStack.pop() gives undo>
+   - <e.g. difference between throw and throws>
