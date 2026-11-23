@@ -97,38 +97,27 @@ Traditional floral shops and boutique botanical studios struggle with disjointed
 
 ## 3. Application Screenshots
 
-> *Note: Place your production application screenshots in the `public/screenshots/` folder to display them in this section.*
+### 1. Homepage — Cinematic Floral Landing Experience
+![BloomBox Homepage](public/screenshots/homepage.png)
+*Interactive 3D procedural flower valley powered by Three.js with realistic botanical geometry and ambient audio.*
 
-```
-+---------------------------------------------------------------------------------+
-|                                 BLOOMBOX HEADER                                 |
-|  [Logo] BloomBox           HOME   COLLECTION   SHOP   BILLING   ADMIN   [Cart]  |
-+---------------------------------------------------------------------------------+
-|                                                                                 |
-|               * * *   3D PROCEDURAL FLORAL VALLEY (THREE.JS)   * * *            |
-|                                                                                 |
-|                          "LET NATURE BLOOM WITH GRACE"                          |
-|             Handcrafted Luxury Stems & Precision Dispatch Invoicing             |
-|                                                                                 |
-|                        [ EXPLORE CATALOG ]   [ VIEW BILLING ]                   |
-+---------------------------------------------------------------------------------+
-|   FLORAL CATALOG           |   SHOPPING CART & BILLING   |   TAX INVOICE MODAL  |
-|   - Rose Bouquet (Rs 450)  |   - 2x Rose Bouquet         |   - 13-Column Table  |
-|   - Jasmine Garland (Rs 120|   - 1x Orchid Stem          |   - 15% Wholesale    |
-|   - Marigold 1kg (Rs 90)   |   Subtotal: Rs. 1,080.00    |   - CGST / SGST      |
-|   - Orchid Stem (Rs 150)   |   Wholesale: -Rs. 162.00    |   - Amount in Words  |
-|   - Table Center (Rs 800)  |   GST (5%):  Rs. 45.90      |   - Bank Settlement  |
-|   - Lily Bunch (Rs 350)    |   Total:     Rs. 963.90     |   - [ Download PDF ] |
-+---------------------------------------------------------------------------------+
-```
+---
 
-| Homepage 3D Floral Valley | Shopping & Collection Catalog |
-| :---: | :---: |
-| *(Add `public/screenshots/home.png`)* | *(Add `public/screenshots/shop.png`)* |
+### 2. Collections — Browse and Filter Floral Products
+![BloomBox Collections](public/screenshots/collections.png)
+*Curated botanical anthology showcasing signature flower arrangements, provenance specifications, and category filtering.*
 
-| A4 Statutory Tax Invoice | Admin Control Dashboard |
-| :---: | :---: |
-| *(Add `public/screenshots/invoice.png`)* | *(Add `public/screenshots/admin.png`)* |
+---
+
+### 3. Invoice — Detailed PDF Tax Invoice Preview
+![BloomBox Invoice](public/screenshots/invoice.png)
+*Statutory Indian Tax Invoice (Sec. 31 of CGST Act, 2017) modal preview featuring a 13-column product table, legal currency in words, and HDFC bank settlement details.*
+
+---
+
+### 4. Admin Dashboard — Revenue, Order and Inventory Management
+![BloomBox Admin Dashboard](public/screenshots/admin-dashboard.png)
+*Greenhouse operations console featuring real-time revenue analytics, active orders, live SKU inventory controls, low-stock alerts, and courier dispatch tracking.*
 
 ---
 
