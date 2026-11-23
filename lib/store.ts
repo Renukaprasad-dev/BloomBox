@@ -28,13 +28,20 @@ export interface CompletedOrder {
   customerPhone?: string;
   customerEmail?: string;
   billingAddress?: string;
+  deliveryAddress?: string;
+  customerNotes?: string;
   customerType: 'Regular' | 'Event Planner';
+  customerCategory?: 'Regular' | 'Event Planner';
   lines: CartItem[];
   subtotal: number;
   discount: number;
   taxableAmount: number;
   gst: number;
   finalTotal: number;
+  grandTotal?: number;
+  paymentStatus?: 'PAID' | 'CASH ON DELIVERY' | 'PENDING';
+  paymentMethod?: 'UPI / NetBanking' | 'Card' | 'Cash on Delivery';
+  orderStatus?: 'CONFIRMED' | 'OUT FOR DELIVERY' | 'DELIVERED';
   rider: string;
   timestamp: string;
 }
