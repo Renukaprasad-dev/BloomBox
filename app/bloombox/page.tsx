@@ -279,7 +279,7 @@ export default function BloomBoxBillingPage() {
           .reduce((sum, l) => sum + l.quantity, 0);
         return {
           ...invItem,
-          stock: invItem.stock - qtyInOrder,
+          stock: Math.max(0, invItem.stock - qtyInOrder),
         };
       });
       setInventory(nextInv);

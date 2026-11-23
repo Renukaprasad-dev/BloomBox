@@ -2,8 +2,7 @@ import { neon } from '@neondatabase/serverless';
 
 const databaseUrl = process.env.DATABASE_URL;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const sql: any = databaseUrl ? neon(databaseUrl) : null;
+export const sql = databaseUrl ? neon(databaseUrl) : null;
 
 export async function queryDatabase<T = Record<string, unknown>>(
   query: string,
@@ -14,7 +13,8 @@ export async function queryDatabase<T = Record<string, unknown>>(
     return [];
   }
   try {
-    const result = await sql(query, params);
+    const queryFn = sql as unknown as (q: string, p?: unknown[]) => Promise<unknown[]>;
+    const result = await queryFn(query, params);
     return result as T[];
   } catch (error) {
     console.error('Database query error:', error);
