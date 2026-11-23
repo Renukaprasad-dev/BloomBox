@@ -525,8 +525,14 @@ export const ValleyScene: React.FC<ValleySceneProps> = ({
     <div className="absolute inset-0 z-0 h-full w-full overflow-hidden bg-black">
       <div ref={containerRef} className="h-full w-full" />
       {!webGlSupported && (
-        <div className="flex h-full w-full items-center justify-center p-8 text-center text-[#f5efe2]/80">
-          <p>WebGL is unavailable on this device. Please enable hardware acceleration in your browser settings.</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#0a0515] via-[#050811] to-black">
+          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_40%,rgba(255,75,147,0.18),transparent_60%),radial-gradient(circle_at_80%_60%,rgba(142,68,173,0.18),transparent_50%)]" />
+          <div className="relative z-10 max-w-md rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md p-6">
+            <h3 className="font-antonio text-xl text-[#f5efe2] mb-2">BloomBox Night Valley</h3>
+            <p className="text-xs text-[#f5efe2]/70 leading-relaxed">
+              Experience optimized for hardware acceleration. Wander through our curated shop catalog and order management portal.
+            </p>
+          </div>
         </div>
       )}
     </div>

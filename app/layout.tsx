@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Fernhollow',
-  description: 'A regenerative design studio. Wander through a night valley of flowers that grows as you move.',
+  title: 'BloomBox — Let Nature Bloom',
+  description: 'BloomBox: Regenerative floral design studio, seasonal flower shop catalog, and precision billing management engine.',
   openGraph: {
-    title: 'Fernhollow',
-    description: 'A regenerative design studio. Wander through a night valley of flowers that grows as you move.',
+    title: 'BloomBox — Let Nature Bloom',
+    description: 'Beautiful flowers. Thoughtful moments. Naturally unforgettable.',
     type: 'website',
   },
 };
@@ -29,11 +29,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Manrope:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Manrope:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="overflow-hidden bg-black font-manrope antialiased selection:bg-[#f5efe2] selection:text-[#151510]">
+      <body className="bg-black font-manrope antialiased selection:bg-[#f5efe2] selection:text-[#151510] min-h-screen">
         {children}
         <div className="vignette-overlay" aria-hidden="true" />
         <div className="cinema-grain" aria-hidden="true" />
