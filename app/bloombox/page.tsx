@@ -53,6 +53,7 @@ export default function BloomBoxBillingPage() {
   const [customerCategory, setCustomerCategory] = useState<'Regular' | 'Event Planner'>('Regular');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerGstin, setCustomerGstin] = useState('');
   const [billingAddress, setBillingAddress] = useState('');
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -246,6 +247,7 @@ export default function BloomBoxBillingPage() {
           customerCategory,
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim(),
+          customerGstin: customerGstin.trim(),
           billingAddress: billingAddress.trim(),
           deliveryAddress: sameAsBilling ? billingAddress.trim() : deliveryAddress.trim(),
           customerNotes: customerNotes.trim(),
@@ -461,18 +463,33 @@ export default function BloomBoxBillingPage() {
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-xs uppercase tracking-wider text-[#f5efe2]/60 mb-2">
-                    Billing Address *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Penthouse 402, High Street, Mumbai 400050"
-                    value={billingAddress}
-                    onChange={(e) => setBillingAddress(e.target.value)}
-                    className="w-full rounded-xl bg-black/60 border border-[#f5efe2]/20 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#f5efe2]"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#f5efe2]/60 mb-2">
+                      Billing Address *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Penthouse 402, High Street, Mumbai 400050"
+                      value={billingAddress}
+                      onChange={(e) => setBillingAddress(e.target.value)}
+                      className="w-full rounded-xl bg-black/60 border border-[#f5efe2]/20 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#f5efe2]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#f5efe2]/60 mb-2">
+                      Customer GSTIN (Optional B2B)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 27AABCT1234F1Z5"
+                      value={customerGstin}
+                      onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                      className="w-full rounded-xl bg-black/60 border border-[#f5efe2]/20 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#f5efe2] font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 mb-4">
@@ -917,14 +934,21 @@ export default function BloomBoxBillingPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => downloadInvoicePdf(activeInvoiceModal)}
+                    onClick={() => setIsDuplicateCopy(!isDuplicateCopy)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-white/20 text-[#f5efe2] text-xs font-semibold uppercase tracking-wider hover:bg-white/10 transition-all"
+                  >
+                    {isDuplicateCopy ? 'Copy: Duplicate' : 'Copy: Original'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadInvoicePdf(activeInvoiceModal, isDuplicateCopy)}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#f5efe2] text-[#151510] text-xs font-semibold uppercase tracking-wider hover:bg-white transition-all shadow"
                   >
                     <Download className="w-3.5 h-3.5" /> Download PDF
                   </button>
                   <button
                     type="button"
-                    onClick={() => shareInvoicePdf(activeInvoiceModal)}
+                    onClick={() => shareInvoicePdf(activeInvoiceModal, isDuplicateCopy)}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-white/20 text-white text-xs font-semibold uppercase tracking-wider hover:bg-white/10 transition-all"
                   >
                     <Share2 className="w-3.5 h-3.5" /> Share
@@ -956,13 +980,13 @@ export default function BloomBoxBillingPage() {
                     <p className="text-[10px] text-[#f5efe2]/50 print:text-gray-500">{STUDIO_CONFIG.address}</p>
                     <p className="text-[10px] text-[#f5efe2]/50 print:text-gray-500">Phone: {STUDIO_CONFIG.phone} | Email: {STUDIO_CONFIG.email}</p>
                     <p className="text-[10px] text-[#f5efe2]/60 print:text-gray-600 font-semibold mt-1">
-                      GSTIN: {STUDIO_CONFIG.gstin} | PAN: {STUDIO_CONFIG.pan}
+                      GSTIN: {STUDIO_CONFIG.gstin} | PAN: {STUDIO_CONFIG.pan} | State: Maharashtra (27)
                     </p>
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-base font-bold text-white print:text-black">{activeInvoiceModal.invoiceNumber}</span>
                     <span className="block text-[10px] text-emerald-400 font-semibold uppercase">
-                      {isDuplicateCopy ? 'DUPLICATE COPY' : 'ORIGINAL FOR RECIPIENT'}
+                      {isDuplicateCopy ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR RECIPIENT'}
                     </span>
                     <p className="text-[11px] text-[#f5efe2]/70 print:text-gray-600 mt-1">Order ID: #{activeInvoiceModal.orderId}</p>
                     <p className="text-[10px] text-[#f5efe2]/50 print:text-gray-500">{activeInvoiceModal.timestamp}</p>
@@ -976,12 +1000,18 @@ export default function BloomBoxBillingPage() {
                     <strong className="text-sm text-white print:text-black block">{activeInvoiceModal.customerName}</strong>
                     <span className="text-[#f5efe2]/80 print:text-gray-700 block">
                       {activeInvoiceModal.customerCategory || activeInvoiceModal.customerType} Client
+                      {(activeInvoiceModal.customerCategory || activeInvoiceModal.customerType) === 'Event Planner' ? ' (15% Wholesale Member)' : ''}
                     </span>
                     <span className="text-[#f5efe2]/70 print:text-gray-600 block">Phone: {activeInvoiceModal.customerPhone}</span>
                     <span className="text-[#f5efe2]/70 print:text-gray-600 block">Email: {activeInvoiceModal.customerEmail}</span>
                     <span className="text-[#f5efe2]/70 print:text-gray-600 block mt-1">
-                      Address: {activeInvoiceModal.billingAddress}
+                      Billing Address: {activeInvoiceModal.billingAddress}
                     </span>
+                    {activeInvoiceModal.customerGstin && (
+                      <span className="text-emerald-400 font-mono text-[10px] block mt-0.5">
+                        GSTIN: {activeInvoiceModal.customerGstin}
+                      </span>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-bold text-[#f5efe2]/50 print:text-gray-500 block mb-1">Dispatch Protocol</span>
@@ -993,6 +1023,11 @@ export default function BloomBoxBillingPage() {
                     <span className="text-[10px] text-emerald-400 uppercase font-semibold block mt-1">
                       Payment Mode: {activeInvoiceModal.paymentMethod || 'UPI / NetBanking'} ({activeInvoiceModal.paymentStatus || 'PAID'})
                     </span>
+                    {activeInvoiceModal.customerNotes && (
+                      <span className="text-[10px] text-[#f5efe2]/50 italic block mt-1">
+                        Notes: {activeInvoiceModal.customerNotes}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1001,7 +1036,8 @@ export default function BloomBoxBillingPage() {
                   <thead>
                     <tr className="border-b border-white/15 text-[11px] uppercase tracking-wider text-[#f5efe2]/60 print:text-gray-600">
                       <th className="py-2">Item #</th>
-                      <th className="py-2">Floral Arrangement</th>
+                      <th className="py-2">Floral Arrangement &amp; Notes</th>
+                      <th className="py-2">Unit</th>
                       <th className="py-2 text-center">Qty</th>
                       <th className="py-2 text-right">Unit Rate</th>
                       <th className="py-2 text-right">Discount</th>
@@ -1010,14 +1046,25 @@ export default function BloomBoxBillingPage() {
                   </thead>
                   <tbody className="divide-y divide-white/10 print:divide-gray-200">
                     {activeInvoiceModal.lines.map((l, i) => {
-                      const discountRate = activeInvoiceModal.customerCategory === 'Event Planner' ? 0.15 : 0;
+                      const isWholesale = (activeInvoiceModal.customerCategory || activeInvoiceModal.customerType) === 'Event Planner';
+                      const discountRate = isWholesale ? 0.15 : 0;
                       const lineDiscount = l.item.price * l.quantity * discountRate;
                       const lineTaxable = l.item.price * l.quantity - lineDiscount;
 
                       return (
                         <tr key={i}>
-                          <td className="py-2.5 font-mono">BB-{l.item.id}</td>
-                          <td className="py-2.5 font-medium">{l.item.name}</td>
+                          <td className="py-2.5 font-mono text-[11px]">BB-{l.item.id}</td>
+                          <td className="py-2.5">
+                            <span className="font-medium text-white print:text-black block">{l.item.name}</span>
+                            {l.item.description && (
+                              <span className="text-[10px] text-[#f5efe2]/50 print:text-gray-600 block leading-tight">
+                                {l.item.description}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-[11px] text-[#f5efe2]/60 print:text-gray-600">
+                            {l.item.stemCount || 'Handcrafted'}
+                          </td>
                           <td className="py-2.5 text-center font-mono">{l.quantity}</td>
                           <td className="py-2.5 text-right font-mono">{formatINR(l.item.price)}</td>
                           <td className="py-2.5 text-right font-mono text-emerald-400 print:text-black">
@@ -1033,30 +1080,50 @@ export default function BloomBoxBillingPage() {
                 </table>
 
                 {/* Financial Summary */}
-                <div className="border-t border-white/15 pt-4 space-y-1.5 text-right max-w-xs ml-auto">
+                <div className="border-t border-white/15 pt-4 space-y-1.5 text-right max-w-sm ml-auto">
                   <div className="flex justify-between">
-                    <span className="text-[#f5efe2]/60 print:text-gray-600">Subtotal:</span>
+                    <span className="text-[#f5efe2]/60 print:text-gray-600">Gross Subtotal:</span>
                     <span className="font-mono">{formatINR(activeInvoiceModal.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#f5efe2]/60 print:text-gray-600">
-                      Discount ({activeInvoiceModal.customerCategory === 'Event Planner' ? '15%' : '0%'}):
+                      Wholesale Discount ({(activeInvoiceModal.customerCategory || activeInvoiceModal.customerType) === 'Event Planner' ? '15%' : '0%'}):
                     </span>
                     <span className="font-mono text-emerald-400 print:text-black">
                       - {formatINR(activeInvoiceModal.discount)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#f5efe2]/60 print:text-gray-600">Taxable Value:</span>
+                    <span className="text-[#f5efe2]/60 print:text-gray-600">Net Taxable Value:</span>
                     <span className="font-mono">{formatINR(activeInvoiceModal.taxableAmount)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#f5efe2]/60 print:text-gray-600">Statutory CGST + SGST (5%):</span>
+                    <span className="text-[#f5efe2]/60 print:text-gray-600">CGST (2.5%):</span>
+                    <span className="font-mono">{formatINR(activeInvoiceModal.gst / 2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#f5efe2]/60 print:text-gray-600">SGST (2.5%):</span>
+                    <span className="font-mono">{formatINR(activeInvoiceModal.gst / 2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#f5efe2]/60 print:text-gray-600">Total Statutory GST (5.0%):</span>
                     <span className="font-mono">{formatINR(activeInvoiceModal.gst)}</span>
                   </div>
                   <div className="flex justify-between text-base font-bold border-t border-white/15 pt-2 text-white print:text-black">
                     <span>Grand Total:</span>
                     <span className="font-mono text-lg">{formatINR(activeInvoiceModal.finalTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#f5efe2]/60 print:text-gray-600 pt-1">
+                    <span>Amount Received:</span>
+                    <span className="font-mono text-white print:text-black">
+                      {activeInvoiceModal.paymentStatus === 'PAID' ? formatINR(activeInvoiceModal.finalTotal) : '₹0.00'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#f5efe2]/60 print:text-gray-600">
+                    <span>Balance Due:</span>
+                    <span className="font-mono text-white print:text-black">
+                      {activeInvoiceModal.paymentStatus === 'PAID' ? '₹0.00' : formatINR(activeInvoiceModal.finalTotal)}
+                    </span>
                   </div>
                 </div>
 

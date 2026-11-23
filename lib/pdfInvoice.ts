@@ -3,22 +3,27 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { CompletedOrder } from './store';
-import { formatINR } from './billingCalculations';
+import { calculateOrderFinancials, formatINR } from './billingCalculations';
 
 export const STUDIO_CONFIG = {
   name: 'BLOOMBOX BOTANICAL SANCTUARY',
   legalName: 'BloomBox Floriculture & Regenerative Design Pvt. Ltd.',
+  tagline: 'Regenerative Botanical Sanctuary & Greenhouse Dispatch',
   address: 'BloomBox Pavilion, Valley Reserve, Highland Estate, Pune - 411001, Maharashtra, India',
   phone: '+91 (800) 425-6629 / +91 98230 45678',
   email: 'orders@bloombox.studio',
+  supportEmail: 'concierge@bloombox.studio',
   gstin: process.env.NEXT_PUBLIC_STUDIO_GSTIN || '27AABCB1234F1Z9',
   pan: 'AABCB1234F',
+  state: 'Maharashtra',
+  stateCode: '27',
 };
 
 /**
- * Builds an authentic, vector A4 PDF invoice using jsPDF and autoTable.
+ * Builds an authentic, vector A4 Tax Invoice PDF using jsPDF and autoTable.
+ * Strictly adheres to Indian Retail GST Tax Invoice standards.
  */
-export function generateInvoiceDocument(order: CompletedOrder): jsPDF {
+export function generateInvoiceDocument(order: CompletedOrder, isDuplicate = false): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -27,291 +32,385 @@ export function generateInvoiceDocument(order: CompletedOrder): jsPDF {
 
   const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
   const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
+  const contentWidth = pageWidth - margin * 2; // 182mm
 
-  // Header Background Bar
-  doc.setFillColor(10, 14, 20); // Deep botanical dark
-  doc.rect(0, 0, pageWidth, 32, 'F');
+  // Ensure calculations are sourced from the centralized integer paise engine
+  const calc = calculateOrderFinancials(
+    order.lines.map((l) => ({
+      id: l.item.id,
+      name: l.item.name,
+      category: l.item.category,
+      price: l.item.price,
+      quantity: l.quantity,
+      item: l.item,
+    })),
+    order.customerCategory || order.customerType
+  );
 
-  // BloomBox Header Title
+  // 1. Top Header Background Bar (Deep obsidian botanical dark)
+  doc.setFillColor(10, 14, 20);
+  doc.rect(0, 0, pageWidth, 34, 'F');
+
+  // Gold accent accent line
+  doc.setFillColor(212, 175, 55); // Gold
+  doc.rect(0, 33.2, pageWidth, 0.8, 'F');
+
+  // BloomBox Brand Title
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(245, 239, 226); // Cream
-  doc.text('BLOOMBOX', margin, 14);
+  doc.setFontSize(20);
+  doc.setTextColor(245, 239, 226); // Warm Cream
+  doc.text('BLOOMBOX', margin, 13);
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(200, 195, 185);
-  doc.text('REGENERATIVE FLORAL SANCTUARY & HAUTE BOTANICAL LOGISTICS', margin, 20);
-  doc.text(`${STUDIO_CONFIG.address} | Phone: ${STUDIO_CONFIG.phone}`, margin, 25);
+  doc.setTextColor(215, 210, 200);
+  doc.text(STUDIO_CONFIG.tagline.toUpperCase(), margin, 18.5);
+  doc.text(STUDIO_CONFIG.address, margin, 23.5);
+  doc.text(
+    `Phone: ${STUDIO_CONFIG.phone}  |  Email: ${STUDIO_CONFIG.email}`,
+    margin,
+    28
+  );
 
   // Top Right "TAX INVOICE" Badge
+  const badgeWidth = 44;
+  const badgeX = pageWidth - margin - badgeWidth;
   doc.setFillColor(245, 239, 226);
-  doc.roundedRect(pageWidth - margin - 40, 8, 40, 16, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(21, 21, 16);
-  doc.text('TAX INVOICE', pageWidth - margin - 20, 15, { align: 'center' });
-  doc.setFontSize(7);
-  doc.text('ORIGINAL FOR RECIPIENT', pageWidth - margin - 20, 19, { align: 'center' });
+  doc.roundedRect(badgeX, 7, badgeWidth, 19, 1.5, 1.5, 'F');
 
-  // Metadata Block: Invoice #, Date, Order ID, Dispatch Token
-  let y = 40;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(20, 20, 20);
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 20, 28);
+  doc.text('TAX INVOICE', badgeX + badgeWidth / 2, 14, { align: 'center' });
 
-  // Left side: Invoice details
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    isDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR RECIPIENT',
+    badgeX + badgeWidth / 2,
+    19,
+    { align: 'center' }
+  );
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(130, 130, 130);
+  doc.text('SEC. 31 OF CGST ACT, 2017', badgeX + badgeWidth / 2, 23, { align: 'center' });
+
+  // 2. Invoice & Dispatch Metadata Block
+  let y = 41;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 35);
   doc.text(`Invoice No: ${order.invoiceNumber}`, margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(60, 60, 60);
-  doc.text(`Invoice Date & Time: ${order.timestamp}`, margin, y + 5);
-  doc.text(`Order ID: ${order.orderId} (Sequential Token #${order.token})`, margin, y + 10);
-  doc.text(`GSTIN: ${STUDIO_CONFIG.gstin} | PAN: ${STUDIO_CONFIG.pan}`, margin, y + 15);
 
-  // Right side: Dispatch & Payment Status
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(70, 75, 85);
+  doc.text(`Date & Time: ${order.timestamp}`, margin, y + 4.5);
+  doc.text(`Order ID: ${order.orderId}  |  Dispatch Token: #${order.token}`, margin, y + 9);
+  doc.text(
+    `Supplier GSTIN: ${STUDIO_CONFIG.gstin}  |  PAN: ${STUDIO_CONFIG.pan}  |  State: ${STUDIO_CONFIG.state} (${STUDIO_CONFIG.stateCode})`,
+    margin,
+    y + 13.5
+  );
+
+  // Right Side: Courier Allocation & Payment Telemetry
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(20, 20, 20);
-  doc.text(`Courier Allocation:`, pageWidth - margin, y, { align: 'right' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(16, 120, 70); // Green
-  doc.text(`${order.rider}`, pageWidth - margin, y + 5, { align: 'right' });
-  doc.setTextColor(60, 60, 60);
-  doc.text(`Payment Status: ${order.paymentStatus || 'PAID'}`, pageWidth - margin, y + 10, { align: 'right' });
-  doc.text(`Payment Mode: ${order.paymentMethod || 'UPI / NetBanking'}`, pageWidth - margin, y + 15, { align: 'right' });
+  doc.setTextColor(15, 23, 35);
+  doc.text('Courier Dispatch:', pageWidth - margin, y, { align: 'right' });
 
-  // Divider
-  y += 22;
-  doc.setDrawColor(210, 210, 210);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(16, 120, 70); // Emerald Green
+  doc.text(`${order.rider}`, pageWidth - margin, y + 4.5, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(70, 75, 85);
+  const paymentStatus = order.paymentStatus || 'PAID';
+  const paymentMethod = order.paymentMethod || 'UPI / NetBanking';
+  doc.text(`Payment Status: ${paymentStatus}`, pageWidth - margin, y + 9, { align: 'right' });
+  doc.text(`Payment Mode: ${paymentMethod}`, pageWidth - margin, y + 13.5, { align: 'right' });
+
+  // Thin dividing line
+  y += 18;
+  doc.setDrawColor(220, 225, 230);
   doc.line(margin, y, pageWidth - margin, y);
 
-  // Customer Information (Two-column: Billed To / Shipped To)
-  y += 6;
-  const colWidth = (contentWidth - 6) / 2;
+  // 3. Customer Information (Two Columns: Billed To / Shipped To)
+  y += 4;
+  const colGap = 6;
+  const colWidth = (contentWidth - colGap) / 2; // 88mm each
+  const boxHeight = 36;
 
-  // Billed To Box
-  doc.setFillColor(248, 248, 246);
-  doc.roundedRect(margin, y, colWidth, 34, 1.5, 1.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(80, 80, 80);
-  doc.text('BILLED TO (CUSTOMER DETAILS)', margin + 3, y + 5);
+  // Box A: Billed To
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, y, colWidth, boxHeight, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(10, 10, 10);
-  doc.text(order.customerName, margin + 3, y + 11);
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('BILLED TO (CUSTOMER DETAILS)', margin + 3.5, y + 4.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(order.customerName, margin + 3.5, y + 10);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(60, 60, 60);
-  doc.text(`Category: ${order.customerCategory || order.customerType} (${order.customerCategory === 'Event Planner' ? '15% Wholesale Member' : 'Retail Standard'})`, margin + 3, y + 16);
-  doc.text(`Phone: ${order.customerPhone || 'N/A'} | Email: ${order.customerEmail || 'N/A'}`, margin + 3, y + 21);
-  const splitBillAddr = doc.splitTextToSize(`Address: ${order.billingAddress || 'N/A'}`, colWidth - 6);
-  doc.text(splitBillAddr, margin + 3, y + 26);
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  const isWholesale = (order.customerCategory || order.customerType) === 'Event Planner';
+  doc.text(
+    `Category: ${order.customerCategory || order.customerType} (${isWholesale ? '15% Wholesale Member' : 'Retail Consumer'})`,
+    margin + 3.5,
+    y + 14.5
+  );
+  doc.text(`Phone: ${order.customerPhone || 'N/A'}  |  Email: ${order.customerEmail || 'N/A'}`, margin + 3.5, y + 19);
 
-  // Delivery Destination Box
-  const rightColX = margin + colWidth + 6;
-  doc.setFillColor(248, 248, 246);
-  doc.roundedRect(rightColX, y, colWidth, 34, 1.5, 1.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(80, 80, 80);
-  doc.text('DELIVERY / COURIER DESTINATION', rightColX + 3, y + 5);
+  const customerGstin = order.customerGstin ? `GSTIN: ${order.customerGstin}` : 'Customer GSTIN: Unregistered Consumer (B2C)';
+  doc.text(customerGstin, margin + 3.5, y + 23.5);
+
+  const splitBillAddr = doc.splitTextToSize(`Billing Address: ${order.billingAddress || 'Studio Walk-in Customer'}`, colWidth - 7);
+  doc.text(splitBillAddr.slice(0, 2), margin + 3.5, y + 28);
+
+  // Box B: Shipped To / Courier Destination
+  const rightColX = margin + colWidth + colGap;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(rightColX, y, colWidth, boxHeight, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(10, 10, 10);
-  doc.text(`Recipient: ${order.customerName}`, rightColX + 3, y + 11);
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('SHIPPED TO (COURIER DESTINATION)', rightColX + 3.5, y + 4.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Recipient: ${order.customerName}`, rightColX + 3.5, y + 10);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(60, 60, 60);
-  doc.text(`Courier Service: ${order.rider}`, rightColX + 3, y + 16);
-  const deliveryAddr = order.deliveryAddress || order.billingAddress || 'Studio Pickup';
-  const splitDelivAddr = doc.splitTextToSize(`Destination: ${deliveryAddr}`, colWidth - 6);
-  doc.text(splitDelivAddr, rightColX + 3, y + 21);
-  if (order.customerNotes) {
-    doc.text(`Instructions: ${order.customerNotes}`, rightColX + 3, y + 30);
-  }
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Assigned Rider: ${order.rider} (Token #${order.token})`, rightColX + 3.5, y + 14.5);
 
-  // Product Table using autoTable
-  y += 40;
-  const tableData = order.lines.map((line, idx) => {
-    const unitPrice = line.item.price;
-    const qty = line.quantity;
-    const discountRate = order.customerCategory === 'Event Planner' ? 0.15 : 0;
-    const lineDiscount = unitPrice * qty * discountRate;
-    const lineTotal = unitPrice * qty - lineDiscount;
+  const deliveryAddr = order.deliveryAddress || order.billingAddress || 'Studio Walk-in Handover';
+  const splitDelivAddr = doc.splitTextToSize(`Delivery Address: ${deliveryAddr}`, colWidth - 7);
+  doc.text(splitDelivAddr.slice(0, 2), rightColX + 3.5, y + 19);
+
+  const notesText = order.customerNotes
+    ? `Instructions: ${order.customerNotes}`
+    : 'Instructions: Eco-friendly hand delivery in temperature-controlled cooler.';
+  const splitNotes = doc.splitTextToSize(notesText, colWidth - 7);
+  doc.text(splitNotes.slice(0, 2), rightColX + 3.5, y + 28);
+
+  // 4. Product Table with Descriptions, Units, and Rates
+  y += boxHeight + 5;
+
+  const tableData = calc.lines.map((line, idx) => {
+    const itemDescription = line.description
+      ? `${line.name}\n${line.description}`
+      : line.name;
 
     return [
       String(idx + 1),
-      `BB-${line.item.id}`,
-      line.item.name,
-      line.item.category,
-      String(qty),
-      `Rs. ${unitPrice.toFixed(2)}`,
-      discountRate > 0 ? `- Rs. ${lineDiscount.toFixed(2)}` : 'Rs. 0.00',
-      `Rs. ${lineTotal.toFixed(2)}`,
+      line.sku,
+      itemDescription,
+      line.category,
+      line.unit,
+      String(line.quantity),
+      `Rs. ${line.unitPrice.toFixed(2)}`,
+      line.discount > 0 ? `- Rs. ${line.discount.toFixed(2)}` : 'Rs. 0.00',
+      `Rs. ${line.taxableTotal.toFixed(2)}`,
     ];
   });
 
   autoTable(doc, {
     startY: y,
-    head: [['#', 'SKU', 'Floral Arrangement', 'Category', 'Qty', 'Unit Rate', 'Discount', 'Taxable Total']],
+    head: [['#', 'SKU', 'Floral Arrangement & Botanical Notes', 'Category', 'Unit', 'Qty', 'Unit Rate', 'Discount', 'Taxable Total']],
     body: tableData,
     margin: { left: margin, right: margin },
     theme: 'grid',
+    showHead: 'everyPage',
     headStyles: {
       fillColor: [15, 23, 35],
       textColor: [245, 239, 226],
-      fontSize: 8,
+      fontSize: 7.5,
       fontStyle: 'bold',
       halign: 'left',
-    },
-    bodyStyles: {
-      fontSize: 8,
-      textColor: [30, 30, 30],
       cellPadding: 2.2,
     },
+    bodyStyles: {
+      fontSize: 7.5,
+      textColor: [30, 30, 30],
+      cellPadding: 2.2,
+      valign: 'middle',
+    },
     columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 16, halign: 'center' },
-      2: { cellWidth: 50 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 12, halign: 'center' },
-      5: { cellWidth: 24, halign: 'right' },
-      6: { cellWidth: 24, halign: 'right' },
-      7: { cellWidth: 26, halign: 'right' },
+      0: { cellWidth: 7, halign: 'center' },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 62 }, // Wide for botanical description
+      3: { cellWidth: 20 },
+      4: { cellWidth: 20 },
+      5: { cellWidth: 10, halign: 'center' },
+      6: { cellWidth: 16, halign: 'right' },
+      7: { cellWidth: 16, halign: 'right' },
+      8: { cellWidth: 16, halign: 'right' },
     },
     alternateRowStyles: {
-      fillColor: [252, 252, 250],
+      fillColor: [252, 253, 255],
     },
   });
 
-  // Calculate final Y after table
+  // Calculate position after product table
   // @ts-expect-error autoTable extends jsPDF instance
   let finalY = doc.lastAutoTable.finalY + 6;
 
-  // Check if we need to add a new page for the summary if table ends too low
-  if (finalY > 215) {
+  // Multi-page protection: if table ends near bottom of page, start fresh page for summary
+  if (finalY > 200) {
     doc.addPage();
-    finalY = 20;
+    finalY = 22;
   }
 
-  // Summary & Totals Block (Right-aligned)
-  const summaryBoxWidth = 85;
+  // 5. Complete Financial Breakdown (Right-Aligned)
+  const summaryBoxWidth = 88;
   const summaryX = pageWidth - margin - summaryBoxWidth;
+  const summaryBoxHeight = 52;
 
-  doc.setFillColor(248, 248, 246);
-  doc.roundedRect(summaryX, finalY, summaryBoxWidth, 42, 1.5, 1.5, 'F');
-  doc.setDrawColor(210, 210, 210);
-  doc.roundedRect(summaryX, finalY, summaryBoxWidth, 42, 1.5, 1.5, 'S');
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(summaryX, finalY, summaryBoxWidth, summaryBoxHeight, 1.5, 1.5, 'FD');
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(60, 60, 60);
+  doc.setTextColor(71, 85, 105);
 
-  let sumY = finalY + 6;
-  doc.text('Subtotal:', summaryX + 4, sumY);
-  doc.text(`Rs. ${order.subtotal.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  let sumY = finalY + 5.5;
+  doc.text('Gross Subtotal:', summaryX + 4, sumY);
+  doc.text(`Rs. ${calc.subtotal.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
 
-  sumY += 5.5;
-  const discPercent = order.customerCategory === 'Event Planner' ? '15%' : '0%';
-  doc.text(`Wholesale Discount (${discPercent}):`, summaryX + 4, sumY);
+  sumY += 5;
+  doc.text(`Wholesale Discount (${calc.discountPercent}):`, summaryX + 4, sumY);
   doc.setTextColor(16, 120, 70);
-  doc.text(`- Rs. ${order.discount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  doc.text(`- Rs. ${calc.discount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
 
-  sumY += 5.5;
-  doc.setTextColor(60, 60, 60);
-  doc.text('Net Taxable Amount:', summaryX + 4, sumY);
-  doc.text(`Rs. ${order.taxableAmount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  sumY += 5;
+  doc.setTextColor(71, 85, 105);
+  doc.text('Net Taxable Value:', summaryX + 4, sumY);
+  doc.text(`Rs. ${calc.taxableAmount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
 
-  sumY += 5.5;
-  doc.text('CGST + SGST (5.0%):', summaryX + 4, sumY);
-  doc.text(`Rs. ${order.gst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  sumY += 5;
+  doc.text(`CGST (${calc.cgstPercent}):`, summaryX + 4, sumY);
+  doc.text(`Rs. ${calc.cgst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
 
-  sumY += 7;
-  doc.setDrawColor(180, 180, 180);
-  doc.line(summaryX + 2, sumY - 2, pageWidth - margin - 2, sumY - 2);
+  sumY += 5;
+  doc.text(`SGST (${calc.sgstPercent}):`, summaryX + 4, sumY);
+  doc.text(`Rs. ${calc.sgst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+
+  sumY += 5;
+  doc.text(`Total Statutory GST (${calc.gstPercent}):`, summaryX + 4, sumY);
+  doc.text(`Rs. ${calc.gst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+
+  // Divider above Grand Total
+  sumY += 4;
+  doc.setDrawColor(203, 213, 225);
+  doc.line(summaryX + 3, sumY - 1, pageWidth - margin - 3, sumY - 1);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.setTextColor(10, 14, 25);
-  doc.text('Grand Total:', summaryX + 4, sumY + 3);
-  doc.text(`Rs. ${order.finalTotal.toFixed(2)}`, pageWidth - margin - 4, sumY + 3, { align: 'right' });
+  doc.setTextColor(15, 23, 42);
+  doc.text('GRAND TOTAL:', summaryX + 4, sumY + 3.5);
+  doc.text(`Rs. ${calc.grandTotal.toFixed(2)}`, pageWidth - margin - 4, sumY + 3.5, { align: 'right' });
 
-  // Left side notes: Terms and Authorized Signatory
-  const notesWidth = contentWidth - summaryBoxWidth - 8;
+  sumY += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  const amountPaid = paymentStatus === 'PAID' ? calc.grandTotal : 0;
+  const balanceDue = paymentStatus === 'PAID' ? 0 : calc.grandTotal;
+  doc.text(`Amount Received: Rs. ${amountPaid.toFixed(2)}  |  Balance Due: Rs. ${balanceDue.toFixed(2)}`, summaryX + 4, sumY);
+
+  // 6. Left Column: Statutory Terms & Authorized Signatory Block
+  const notesWidth = contentWidth - summaryBoxWidth - 6;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(70, 70, 70);
-  doc.text('TERMS & CONDITIONS:', margin, finalY + 6);
+  doc.setTextColor(51, 65, 85);
+  doc.text('TERMS & CONDITIONS:', margin, finalY + 5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(90, 90, 90);
+  doc.setTextColor(100, 116, 139);
   const termsText = [
-    '1. Fresh floral specimens are perishable and certified hand-inspected upon courier dispatch.',
-    '2. Store in fresh water at 16–22°C away from direct drafts to maximize vase life.',
-    '3. This invoice is digitally generated under GST statutory rules and constitutes a valid tax document.',
+    '1. All floral stems are harvested from regenerative soils and verified 100% biodegradable.',
+    '2. Store blooms in chilled water (16–21°C) away from direct sunlight to preserve peak beauty.',
+    '3. This digital tax invoice is generated under Sec. 31 of CGST Act, 2017 and is legally binding.',
+    '4. For inquiries or replacements, please contact orders@bloombox.studio within 24 hours.',
   ];
   termsText.forEach((t, i) => {
-    doc.text(t, margin, finalY + 11 + i * 4.5);
+    doc.text(t, margin, finalY + 9.5 + i * 4);
   });
 
-  // Authorized Signature Box
-  const sigY = finalY + 28;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, sigY + 12, margin + 45, sigY + 12);
+  // Authorized Signatory Block
+  const sigY = finalY + 32;
+  doc.setDrawColor(203, 213, 225);
+  doc.line(margin, sigY + 11, margin + 50, sigY + 11);
+
   doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(40, 40, 40);
-  doc.text('For BLOOMBOX FLORAL STUDIO', margin, sigY + 9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  doc.text('Authorized Signatory', margin, sigY + 16);
+  doc.setTextColor(30, 41, 59);
+  doc.text('For BLOOMBOX BOTANICAL SANCTUARY', margin, sigY + 8);
 
-  // Footer on all pages
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Authorized Digital Signatory', margin, sigY + 15);
+
+  // 7. Dynamic Footer across all generated pages
   const totalPages = doc.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
 
     const footerY = 290;
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, footerY - 3, pageWidth - margin, footerY - 3);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, footerY - 2.5, pageWidth - margin, footerY - 2.5);
 
     doc.text(
-      'Thank you for nurturing nature with BloomBox. Handcrafted with organic botanical integrity.',
+      'BloomBox Studio • 100% Compostable Flora • Zero Plastic • Courier Routing: Odd = Rider 1, Even = Rider 2',
       margin,
       footerY
     );
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, footerY, { align: 'right' });
+    doc.text(`Page ${p} of ${totalPages}`, pageWidth - margin, footerY, { align: 'right' });
   }
 
   return doc;
 }
 
 /**
- * Downloads the invoice PDF with proper naming: BloomBox_INV-2026-0001.pdf
+ * Downloads the invoice PDF with correct standardized filename:
+ * e.g., BloomBox_INV-2026-0003.pdf
  */
-export function downloadInvoicePdf(order: CompletedOrder): void {
-  const doc = generateInvoiceDocument(order);
-  const filename = `BloomBox_${order.invoiceNumber}.pdf`;
+export function downloadInvoicePdf(order: CompletedOrder, isDuplicate = false): void {
+  const doc = generateInvoiceDocument(order, isDuplicate);
+  const cleanInvNum = order.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `BloomBox_${cleanInvNum}${isDuplicate ? '_Duplicate' : ''}.pdf`;
   doc.save(filename);
 }
 
 /**
- * Shares the invoice via Web Share API when supported, or falls back to download.
+ * Shares the invoice via Web Share API when supported, or falls back to direct download.
  */
-export async function shareInvoicePdf(order: CompletedOrder): Promise<boolean> {
-  const doc = generateInvoiceDocument(order);
-  const filename = `BloomBox_${order.invoiceNumber}.pdf`;
+export async function shareInvoicePdf(order: CompletedOrder, isDuplicate = false): Promise<boolean> {
+  const doc = generateInvoiceDocument(order, isDuplicate);
+  const cleanInvNum = order.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `BloomBox_${cleanInvNum}.pdf`;
 
   if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
     try {
@@ -319,8 +418,8 @@ export async function shareInvoicePdf(order: CompletedOrder): Promise<boolean> {
       const file = new File([blob], filename, { type: 'application/pdf' });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `BloomBox Invoice ${order.invoiceNumber}`,
-          text: `Your official BloomBox tax invoice for order #${order.orderId} (Grand Total: ${formatINR(order.finalTotal)}).`,
+          title: `BloomBox Tax Invoice ${order.invoiceNumber}`,
+          text: `Official tax invoice for BloomBox order #${order.orderId} (Grand Total: ${formatINR(order.finalTotal)}).`,
           files: [file],
         });
         return true;
@@ -331,6 +430,6 @@ export async function shareInvoicePdf(order: CompletedOrder): Promise<boolean> {
   }
 
   // Fallback to direct download
-  downloadInvoicePdf(order);
+  downloadInvoicePdf(order, isDuplicate);
   return false;
 }

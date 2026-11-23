@@ -28,6 +28,7 @@ export async function GET(request: Request) {
       customer_category: 'Regular' | 'Event Planner';
       customer_phone: string;
       customer_email: string;
+      customer_gstin?: string;
       billing_address: string;
       delivery_address: string;
       customer_notes: string;
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
         customerType: r.customer_category,
         customerPhone: r.customer_phone || '',
         customerEmail: r.customer_email || '',
+        customerGstin: r.customer_gstin || undefined,
         billingAddress: r.billing_address,
         deliveryAddress: r.delivery_address || undefined,
         customerNotes: r.customer_notes || undefined,
@@ -104,6 +106,7 @@ export async function POST(request: Request) {
       customerCategory,
       customerPhone,
       customerEmail,
+      customerGstin,
       billingAddress,
       deliveryAddress,
       customerNotes,
@@ -153,6 +156,7 @@ export async function POST(request: Request) {
         customerType: customerCategory,
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim(),
+        customerGstin: customerGstin?.trim() || undefined,
         billingAddress: billingAddress.trim(),
         deliveryAddress: deliveryAddress?.trim() || undefined,
         customerNotes: customerNotes?.trim() || undefined,
@@ -215,10 +219,10 @@ export async function POST(request: Request) {
     await queryDatabase(
       `INSERT INTO bloombox_orders (
         order_id, invoice_number, token, customer_name, customer_category,
-        customer_phone, customer_email, billing_address, delivery_address,
+        customer_phone, customer_email, customer_gstin, billing_address, delivery_address,
         customer_notes, lines_json, subtotal, discount, taxable_amount,
         gst, grand_total, payment_status, payment_method, order_status, rider
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
       [
         orderId,
         invoiceNumber,
@@ -227,6 +231,7 @@ export async function POST(request: Request) {
         customerCategory,
         customerPhone.trim(),
         customerEmail.trim(),
+        customerGstin?.trim() || null,
         billingAddress.trim(),
         deliveryAddress?.trim() || null,
         customerNotes?.trim() || null,
@@ -252,6 +257,7 @@ export async function POST(request: Request) {
       customerType: customerCategory,
       customerPhone: customerPhone.trim(),
       customerEmail: customerEmail.trim(),
+      customerGstin: customerGstin?.trim() || undefined,
       billingAddress: billingAddress.trim(),
       deliveryAddress: deliveryAddress?.trim() || undefined,
       customerNotes: customerNotes?.trim() || undefined,

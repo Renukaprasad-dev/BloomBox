@@ -27,6 +27,7 @@ export interface CompletedOrder {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerGstin?: string;
   billingAddress?: string;
   deliveryAddress?: string;
   customerNotes?: string;
