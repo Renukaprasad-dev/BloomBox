@@ -157,14 +157,16 @@ export default function BloomBoxHomePage() {
                     </span>
                   </div>
 
-                  <div
-                    className={`h-40 w-full rounded-2xl bg-gradient-to-br ${item.imageColor} border border-white/10 flex items-center justify-center p-5 mb-5 relative overflow-hidden`}
-                  >
-                    <div
-                      className="absolute inset-0 opacity-25 blur-lg"
-                      style={{ backgroundColor: item.accentColor }}
+                  <div className="h-44 w-full rounded-2xl border border-white/10 mb-5 relative overflow-hidden bg-black/60">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                     />
-                    <h4 className="font-antonio text-3xl tracking-wide text-white text-center relative z-10">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <h4 className="font-antonio text-3xl tracking-wide text-white absolute bottom-3 left-3 right-3 drop-shadow-md">
                       {item.name}
                     </h4>
                   </div>

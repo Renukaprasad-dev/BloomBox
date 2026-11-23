@@ -85,6 +85,8 @@ export default function AdminDashboardPage() {
       description: newProduct.description.trim() || 'Hand-harvested botanical arrangement.',
       imageColor: 'from-emerald-950/40 to-black',
       accentColor: '#10b981',
+      imageUrl: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=1000&q=80',
+      collectionName: `${newProduct.name.trim()} Collection`,
     };
 
     const nextInv = [...inventory, created];
