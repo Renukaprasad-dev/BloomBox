@@ -28,7 +28,10 @@ import {
   Key,
   RefreshCw,
   Database,
+  Download,
+  Trash2,
 } from 'lucide-react';
+import { downloadInvoicePdf } from '@/lib/pdfInvoice';
 
 export default function AdminDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,6 +43,7 @@ export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<CompletedOrder[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'orders'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [dataSource, setDataSource] = useState<'neon' | 'local'>('local');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -153,6 +157,15 @@ export default function AdminDashboardPage() {
     } catch {
       // Local fallback handled
     }
+  };
+
+  const handleDeleteProduct = (productId: number) => {
+    if (!confirm('Are you sure you want to retire this flora SKU from the active catalog?')) return;
+    const updated = inventory.filter((item) => item.id !== productId);
+    setInventory(updated);
+    saveStoredInventory(updated);
+    setSyncMessage(`SKU #${productId} retired from catalog.`);
+    setTimeout(() => setSyncMessage(''), 3000);
   };
 
   const handleUpdatePrice = async (productId: number, newPrice: number) => {
@@ -465,66 +478,98 @@ export default function AdminDashboardPage() {
 
             {/* Tab 2: Inventory */}
             {activeTab === 'inventory' && (
-              <div className="rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/80 overflow-hidden backdrop-blur-md">
+              <div className="rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/80 overflow-hidden backdrop-blur-md p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <h3 className="font-antonio text-2xl text-white">Botanical Catalog &amp; Greenhouse Stock</h3>
+                  <div className="relative max-w-xs w-full">
+                    <Search className="w-3.5 h-3.5 text-[#f5efe2]/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filter by name, SKU or category..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-black/50 border border-white/15 text-xs text-white focus:outline-none focus:border-white"
+                    />
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-black/50 text-[#f5efe2]/60 uppercase tracking-wider border-b border-white/5">
                       <tr>
-                        <th className="p-5">ID</th>
-                        <th className="p-5">Flower Name</th>
-                        <th className="p-5">Category</th>
-                        <th className="p-5">Price (₹)</th>
-                        <th className="p-5">Stock Level</th>
-                        <th className="p-5">Adjust Quantity</th>
+                        <th className="p-4">SKU / ID</th>
+                        <th className="p-4">Flower Name</th>
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Price (₹)</th>
+                        <th className="p-4">Stock Level</th>
+                        <th className="p-4">Adjust Quantity</th>
+                        <th className="p-4 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {inventory.map((item) => (
-                        <tr key={item.id} className="hover:bg-white/[0.02]">
-                          <td className="p-5 font-mono font-bold text-white">#{item.id}</td>
-                          <td className="p-5 font-medium text-white">{item.name}</td>
-                          <td className="p-5 text-[#f5efe2]/70">{item.category}</td>
-                          <td className="p-5 font-mono">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.price}
-                              onChange={(e) => handleUpdatePrice(item.id, Number(e.target.value))}
-                              className="w-20 px-2 py-1 bg-white/5 border border-white/20 rounded font-mono text-white text-xs"
-                            />
-                          </td>
-                          <td className="p-5">
-                            <span className={`font-mono font-bold ${item.stock <= 8 ? 'text-amber-400' : 'text-white'}`}>
-                              {item.stock} units
-                            </span>
-                          </td>
-                          <td className="p-5">
-                            <div className="flex items-center gap-2">
+                      {inventory
+                        .filter(
+                          (item) =>
+                            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            String(item.id).includes(searchQuery)
+                        )
+                        .map((item) => (
+                          <tr key={item.id} className="hover:bg-white/[0.02]">
+                            <td className="p-4 font-mono font-bold text-white">#BB-{item.id}</td>
+                            <td className="p-4 font-medium text-white">{item.name}</td>
+                            <td className="p-4 text-[#f5efe2]/70">{item.category}</td>
+                            <td className="p-4 font-mono">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.price}
+                                onChange={(e) => handleUpdatePrice(item.id, Number(e.target.value))}
+                                className="w-20 px-2 py-1 bg-white/5 border border-white/20 rounded font-mono text-white text-xs"
+                              />
+                            </td>
+                            <td className="p-4">
+                              <span className={`font-mono font-bold ${item.stock <= 8 ? 'text-amber-400' : 'text-white'}`}>
+                                {item.stock} units
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStock(item.id, item.stock - 5)}
+                                  className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs"
+                                >
+                                  -5
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStock(item.id, item.stock + 5)}
+                                  className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs"
+                                >
+                                  +5
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStock(item.id, item.stock + 20)}
+                                  className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-semibold"
+                                >
+                                  +20 Restock
+                                </button>
+                              </div>
+                            </td>
+                            <td className="p-4 text-center">
                               <button
                                 type="button"
-                                onClick={() => handleUpdateStock(item.id, item.stock - 5)}
-                                className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs"
+                                onClick={() => handleDeleteProduct(item.id)}
+                                className="p-2 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                title="Retire SKU from catalog"
                               >
-                                -5
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateStock(item.id, item.stock + 5)}
-                                className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs"
-                              >
-                                +5
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateStock(item.id, item.stock + 20)}
-                                className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-semibold"
-                              >
-                                +20 Restock
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -534,24 +579,68 @@ export default function AdminDashboardPage() {
             {/* Tab 3: Orders */}
             {activeTab === 'orders' && (
               <div className="rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/80 p-8 backdrop-blur-md">
-                <h3 className="font-antonio text-2xl text-white mb-6">Master Order Ledger</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <h3 className="font-antonio text-2xl text-white">Master Order Ledger</h3>
+                  <div className="relative max-w-xs w-full">
+                    <Search className="w-3.5 h-3.5 text-[#f5efe2]/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search orders, invoices, riders..."
+                      value={orderSearchQuery}
+                      onChange={(e) => setOrderSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-black/50 border border-white/15 text-xs text-white focus:outline-none focus:border-white"
+                    />
+                  </div>
+                </div>
+
                 {orders.length === 0 ? (
                   <p className="text-xs text-[#f5efe2]/40 italic py-8 text-center">No transactions recorded yet.</p>
                 ) : (
                   <div className="space-y-4">
-                    {orders.map((o) => (
-                      <div key={o.invoiceNumber} className="p-4 rounded-xl border border-white/5 bg-black/40 text-xs flex justify-between items-center">
-                        <div>
-                          <span className="font-mono font-bold text-white">#{o.invoiceNumber}</span> ({o.orderId})
-                          <p className="text-[#f5efe2]/60 mt-1">{o.customerName} &bull; {o.customerType} &bull; {o.timestamp}</p>
-                          <p className="text-[#f5efe2]/40 text-[11px] mt-0.5">{o.lines.map((l) => `${l.item.name} (×${l.quantity})`).join(', ')}</p>
+                    {orders
+                      .filter((o) => {
+                        const q = orderSearchQuery.toLowerCase();
+                        return (
+                          o.invoiceNumber.toLowerCase().includes(q) ||
+                          o.customerName.toLowerCase().includes(q) ||
+                          o.orderId.toLowerCase().includes(q) ||
+                          (o.rider && o.rider.toLowerCase().includes(q))
+                        );
+                      })
+                      .map((o) => (
+                        <div
+                          key={o.invoiceNumber}
+                          className="p-5 rounded-2xl border border-white/5 bg-black/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/15 transition-all"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-mono font-bold text-white text-sm">#{o.invoiceNumber}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] uppercase font-semibold">
+                                {o.orderStatus || 'CONFIRMED'}
+                              </span>
+                            </div>
+                            <p className="text-[#f5efe2]/70 mt-0.5">
+                              {o.customerName} &bull; {o.customerType || o.customerCategory} Client &bull; {o.timestamp}
+                            </p>
+                            <p className="text-[#f5efe2]/40 text-[11px] mt-1">
+                              {o.lines.map((l) => `${l.item.name} (×${l.quantity})`).join(', ')}
+                            </p>
+                          </div>
+                          <div className="flex sm:flex-col items-end justify-between sm:justify-center gap-2">
+                            <span className="font-mono font-bold text-emerald-400 text-base">₹{o.finalTotal.toFixed(2)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-[#f5efe2]/50 uppercase">{o.rider}</span>
+                              <button
+                                type="button"
+                                onClick={() => downloadInvoicePdf(o)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f5efe2] text-[#151510] hover:bg-white text-[11px] font-semibold uppercase tracking-wider transition-all shadow"
+                              >
+                                <Download className="w-3.5 h-3.5" /> PDF
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-mono font-bold text-emerald-400 text-sm">₹{o.finalTotal.toFixed(2)}</span>
-                          <span className="block text-[10px] text-[#f5efe2]/50 uppercase mt-0.5">{o.rider}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>

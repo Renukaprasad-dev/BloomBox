@@ -15,7 +15,7 @@ import {
   getStoredOrders,
   saveStoredOrders,
 } from '@/lib/store';
-import { calculateOrderFinancials, formatINR } from '@/lib/billingCalculations';
+import { calculateOrderFinancials, formatINR, numberToWordsINR, STUDIO_BANK_DETAILS } from '@/lib/billingCalculations';
 import { downloadInvoicePdf, shareInvoicePdf, STUDIO_CONFIG } from '@/lib/pdfInvoice';
 import {
   ShoppingBag,
@@ -1127,7 +1127,30 @@ export default function BloomBoxBillingPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-white/10 pt-6 text-[10px] text-[#f5efe2]/50 print:text-gray-500 text-center">
+                {/* Amount in Words & Bank Settlement */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
+                    <span className="text-[10px] uppercase font-bold text-[#f5efe2]/50 print:text-gray-500 block mb-1">
+                      Amount in Words (INR):
+                    </span>
+                    <p className="text-xs font-semibold text-white print:text-black">
+                      {numberToWordsINR(activeInvoiceModal.finalTotal)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3.5 text-[11px]">
+                    <span className="text-[10px] uppercase font-bold text-[#f5efe2]/50 print:text-gray-500 block mb-1">
+                      Settlement &amp; Bank Details:
+                    </span>
+                    <p className="text-[#f5efe2]/80 print:text-gray-700">
+                      <strong>{STUDIO_BANK_DETAILS.bankName}</strong> &bull; A/C: {STUDIO_BANK_DETAILS.accountNumber}
+                    </p>
+                    <p className="text-[#f5efe2]/60 print:text-gray-600">
+                      IFSC: {STUDIO_BANK_DETAILS.ifsc} &bull; UPI: {STUDIO_BANK_DETAILS.upiId}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4 text-[10px] text-[#f5efe2]/50 print:text-gray-500 text-center">
                   This document is a certified digital tax invoice issued under statutory GST provisions. Stems are hand-inspected and 100% biodegradable.
                 </div>
               </div>

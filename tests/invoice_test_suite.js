@@ -5,9 +5,53 @@
 
 const { jsPDF } = require('jspdf');
 const autoTable = require('jspdf-autotable');
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const fs = require('fs');
 const path = require('path');
+
+function numberToWordsINR(amount) {
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function inWords(num) {
+    if (num === 0) return '';
+    let str = '';
+    if (num >= 10000000) {
+      str += inWords(Math.floor(num / 10000000)) + 'Crore ';
+      num %= 10000000;
+    }
+    if (num >= 100000) {
+      str += inWords(Math.floor(num / 100000)) + 'Lakh ';
+      num %= 100000;
+    }
+    if (num >= 1000) {
+      str += inWords(Math.floor(num / 1000)) + 'Thousand ';
+      num %= 1000;
+    }
+    if (num >= 100) {
+      str += inWords(Math.floor(num / 100)) + 'Hundred ';
+      num %= 100;
+    }
+    if (num > 0) {
+      if (num < 20) {
+        str += a[num];
+      } else {
+        str += b[Math.floor(num / 10)] + (num % 10 !== 0 ? '-' + a[num % 10].trim() : '') + ' ';
+      }
+    }
+    return str;
+  }
+
+  const rounded = Math.round(amount * 100) / 100;
+  const rupees = Math.floor(rounded);
+  const paise = Math.round((rounded - rupees) * 100);
+
+  let result = 'Rupees ' + (rupees === 0 ? 'Zero ' : inWords(rupees)).trim();
+  if (paise > 0) {
+    result += ' and ' + inWords(paise).trim() + ' Paise';
+  }
+  return result + ' Only';
+}
 
 /** Centralized integer paise arithmetic calculation engine */
 function calculateOrderFinancials(rawLines, customerCategory = 'Regular') {
@@ -58,6 +102,7 @@ function calculateOrderFinancials(rawLines, customerCategory = 'Regular') {
   const cgstPaise = Math.floor(gstPaise / 2);
   const sgstPaise = gstPaise - cgstPaise;
   const grandTotalPaise = taxableAmountPaise + gstPaise;
+  const grandTotal = grandTotalPaise / 100;
 
   return {
     lines,
@@ -82,7 +127,8 @@ function calculateOrderFinancials(rawLines, customerCategory = 'Regular') {
     sgstPaise,
     sgst: sgstPaise / 100,
     grandTotalPaise,
-    grandTotal: grandTotalPaise / 100,
+    grandTotal,
+    amountInWords: numberToWordsINR(grandTotal),
     jurisdiction: 'Intra-State Supply (Maharashtra, State Code: 27)',
   };
 }
@@ -99,7 +145,7 @@ const CATALOG = [
 
 const STUDIO_CONFIG = {
   name: 'BLOOMBOX BOTANICAL SANCTUARY',
-  tagline: 'Regenerative Botanical Sanctuary & Greenhouse Dispatch',
+  tagline: 'Regenerative Botanical Sanctuary & Greenhouse Dispatch System',
   address: 'BloomBox Pavilion, Valley Reserve, Highland Estate, Pune - 411001, Maharashtra, India',
   phone: '+91 (800) 425-6629 / +91 98230 45678',
   email: 'orders@bloombox.studio',
@@ -117,7 +163,7 @@ function generateTestPdf(order, isDuplicate = false) {
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 14;
+  const margin = 11;
   const contentWidth = pageWidth - margin * 2;
 
   const calc = calculateOrderFinancials(
@@ -134,139 +180,146 @@ function generateTestPdf(order, isDuplicate = false) {
 
   // Header background
   doc.setFillColor(10, 14, 20);
-  doc.rect(0, 0, pageWidth, 34, 'F');
+  doc.rect(0, 0, pageWidth, 32, 'F');
   doc.setFillColor(212, 175, 55);
-  doc.rect(0, 33.2, pageWidth, 0.8, 'F');
+  doc.rect(0, 31.4, pageWidth, 0.6, 'F');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
+  doc.setFontSize(18);
   doc.setTextColor(245, 239, 226);
-  doc.text('BLOOMBOX', margin, 13);
+  doc.text('BLOOMBOX', margin, 12);
 
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(215, 210, 200);
-  doc.text(STUDIO_CONFIG.tagline.toUpperCase(), margin, 18.5);
-  doc.text(STUDIO_CONFIG.address, margin, 23.5);
-  doc.text(`Phone: ${STUDIO_CONFIG.phone}  |  Email: ${STUDIO_CONFIG.email}`, margin, 28);
+  doc.text(STUDIO_CONFIG.tagline.toUpperCase(), margin, 17);
+  doc.text(STUDIO_CONFIG.address, margin, 21.5);
+  doc.text(`Tel: ${STUDIO_CONFIG.phone}  |  Email: ${STUDIO_CONFIG.email}`, margin, 26);
 
-  const badgeWidth = 44;
+  const badgeWidth = 46;
   const badgeX = pageWidth - margin - badgeWidth;
   doc.setFillColor(245, 239, 226);
-  doc.roundedRect(badgeX, 7, badgeWidth, 19, 1.5, 1.5, 'F');
+  doc.roundedRect(badgeX, 6, badgeWidth, 20, 1.5, 1.5, 'F');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(15, 20, 28);
-  doc.text('TAX INVOICE', badgeX + badgeWidth / 2, 14, { align: 'center' });
+  doc.text('TAX INVOICE', badgeX + badgeWidth / 2, 13, { align: 'center' });
 
   doc.setFontSize(6.5);
-  doc.text(isDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR RECIPIENT', badgeX + badgeWidth / 2, 19, { align: 'center' });
+  doc.text(isDuplicate ? 'DUPLICATE FOR TRANSPORTER' : 'ORIGINAL FOR RECIPIENT', badgeX + badgeWidth / 2, 18, { align: 'center' });
 
   // Metadata
-  let y = 41;
+  let y = 38;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 35);
   doc.text(`Invoice No: ${order.invoiceNumber}`, margin, y);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(70, 75, 85);
-  doc.text(`Date & Time: ${order.timestamp}`, margin, y + 4.5);
-  doc.text(`Order ID: ${order.orderId}  |  Dispatch Token: #${order.token}`, margin, y + 9);
-  doc.text(`Supplier GSTIN: ${STUDIO_CONFIG.gstin}  |  PAN: ${STUDIO_CONFIG.pan}  |  State: ${STUDIO_CONFIG.state} (${STUDIO_CONFIG.stateCode})`, margin, y + 13.5);
+  doc.text(`Issue Date & Time: ${order.timestamp}`, margin, y + 4);
+  doc.text(`Order Reference: ${order.orderId}  |  Dispatch Token: #${order.token}`, margin, y + 8);
+  doc.text(`Supplier GSTIN: ${STUDIO_CONFIG.gstin}  |  PAN: ${STUDIO_CONFIG.pan}  |  State: ${STUDIO_CONFIG.state} (${STUDIO_CONFIG.stateCode})`, margin, y + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 35);
-  doc.text('Courier Dispatch:', pageWidth - margin, y, { align: 'right' });
+  doc.text('Dispatch Courier & Status:', pageWidth - margin, y, { align: 'right' });
   doc.setTextColor(16, 120, 70);
-  doc.text(`${order.rider}`, pageWidth - margin, y + 4.5, { align: 'right' });
+  doc.text(`${order.rider} • PREPARED & INSPECTED`, pageWidth - margin, y + 4, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(70, 75, 85);
-  doc.text(`Payment Status: ${order.paymentStatus || 'PAID'}`, pageWidth - margin, y + 9, { align: 'right' });
-  doc.text(`Payment Mode: ${order.paymentMethod || 'UPI / NetBanking'}`, pageWidth - margin, y + 13.5, { align: 'right' });
+  doc.text(`Payment: ${order.paymentStatus || 'PAID'} (${order.paymentMethod || 'UPI / NetBanking'})`, pageWidth - margin, y + 8, { align: 'right' });
+  doc.text(`Dispatch Priority: Certified White-Glove Eco Transport`, pageWidth - margin, y + 12, { align: 'right' });
 
-  y += 18;
+  y += 16;
   doc.setDrawColor(220, 225, 230);
   doc.line(margin, y, pageWidth - margin, y);
 
-  // Customer Details
-  y += 4;
-  const colGap = 6;
-  const colWidth = (contentWidth - colGap) / 2;
-  const boxHeight = 36;
+  // Customer Details: 3-Column Layout
+  y += 3.5;
+  const colGap = 4;
+  const colWidth = (contentWidth - colGap * 2) / 3;
+  const cardHeight = 32;
 
+  // Seller Details
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(margin, y, colWidth, boxHeight, 1.5, 1.5, 'FD');
-
+  doc.roundedRect(margin, y, colWidth, cardHeight, 1.2, 1.2, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('BILLED TO (CUSTOMER DETAILS)', margin + 3.5, y + 4.5);
+  doc.text('SELLER DETAILS', margin + 3, y + 4);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(order.customerName, margin + 3.5, y + 10);
-
+  doc.text(STUDIO_CONFIG.name, margin + 3, y + 8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`GSTIN: ${STUDIO_CONFIG.gstin}`, margin + 3, y + 12.5);
+  doc.text(`Email: ${STUDIO_CONFIG.email}`, margin + 3, y + 16.5);
+
+  // Bill To
+  const col2X = margin + colWidth + colGap;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(col2X, y, colWidth, cardHeight, 1.2, 1.2, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('BILL TO (CUSTOMER)', col2X + 3, y + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(order.customerName, col2X + 3, y + 8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
   const isWholesale = (order.customerCategory || order.customerType) === 'Event Planner';
-  doc.text(`Category: ${order.customerCategory || order.customerType} (${isWholesale ? '15% Wholesale Member' : 'Retail Consumer'})`, margin + 3.5, y + 14.5);
-  doc.text(`Phone: ${order.customerPhone || 'N/A'}  |  Email: ${order.customerEmail || 'N/A'}`, margin + 3.5, y + 19);
-  doc.text(order.customerGstin ? `GSTIN: ${order.customerGstin}` : 'Customer GSTIN: Unregistered Consumer (B2C)', margin + 3.5, y + 23.5);
+  doc.text(`Type: ${order.customerCategory || order.customerType} (${isWholesale ? '15% Wholesale' : 'Retail'})`, col2X + 3, y + 12.5);
+  doc.text(`Phone: ${order.customerPhone || 'N/A'}`, col2X + 3, y + 16.5);
 
-  const splitBillAddr = doc.splitTextToSize(`Billing Address: ${order.billingAddress || 'Studio Walk-in Customer'}`, colWidth - 7);
-  doc.text(splitBillAddr.slice(0, 2), margin + 3.5, y + 28);
-
-  const rightColX = margin + colWidth + colGap;
+  // Ship To
+  const col3X = col2X + colWidth + colGap;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(rightColX, y, colWidth, boxHeight, 1.5, 1.5, 'FD');
-
+  doc.roundedRect(col3X, y, colWidth, cardHeight, 1.2, 1.2, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('SHIPPED TO (COURIER DESTINATION)', rightColX + 3.5, y + 4.5);
+  doc.text('SHIP TO (COURIER DESTINATION)', col3X + 3, y + 4);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Recipient: ${order.customerName}`, rightColX + 3.5, y + 10);
-
+  doc.text(order.customerName, col3X + 3, y + 8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Assigned Rider: ${order.rider} (Token #${order.token})`, rightColX + 3.5, y + 14.5);
-
-  const deliveryAddr = order.deliveryAddress || order.billingAddress || 'Studio Walk-in Handover';
-  const splitDelivAddr = doc.splitTextToSize(`Delivery Address: ${deliveryAddr}`, colWidth - 7);
-  doc.text(splitDelivAddr.slice(0, 2), rightColX + 3.5, y + 19);
-
-  const notesText = order.customerNotes ? `Instructions: ${order.customerNotes}` : 'Instructions: Eco-friendly hand delivery.';
-  const splitNotes = doc.splitTextToSize(notesText, colWidth - 7);
-  doc.text(splitNotes.slice(0, 2), rightColX + 3.5, y + 28);
+  doc.text(`Assigned: ${order.rider}`, col3X + 3, y + 12.5);
 
   // Table
-  y += boxHeight + 5;
+  y += cardHeight + 4;
   const tableData = calc.lines.map((line, idx) => [
     String(idx + 1),
     line.sku,
     `${line.name}\n${line.description}`,
     line.category,
-    line.unit,
     String(line.quantity),
+    line.unit,
     `Rs. ${line.unitPrice.toFixed(2)}`,
     line.discount > 0 ? `- Rs. ${line.discount.toFixed(2)}` : 'Rs. 0.00',
     `Rs. ${line.taxableTotal.toFixed(2)}`,
+    '5.0%',
+    `Rs. ${(line.taxableTotal * 0.05).toFixed(2)}`,
+    `Rs. ${(line.taxableTotal * 1.05).toFixed(2)}`,
   ]);
 
   autoTable.default(doc, {
     startY: y,
-    head: [['#', 'SKU', 'Floral Arrangement & Botanical Notes', 'Category', 'Unit', 'Qty', 'Unit Rate', 'Discount', 'Taxable Total']],
+    head: [['Sr', 'SKU', 'Flower Name & Description', 'Category', 'Qty', 'Unit', 'Unit Price', 'Discount', 'Taxable', 'GST %', 'GST Amt', 'Total']],
     body: tableData,
     margin: { left: margin, right: margin },
     theme: 'grid',
@@ -274,87 +327,109 @@ function generateTestPdf(order, isDuplicate = false) {
     headStyles: {
       fillColor: [15, 23, 35],
       textColor: [245, 239, 226],
-      fontSize: 7.5,
+      fontSize: 6.8,
       fontStyle: 'bold',
       halign: 'left',
-      cellPadding: 2.2,
+      cellPadding: 1.8,
     },
     bodyStyles: {
-      fontSize: 7.5,
+      fontSize: 6.8,
       textColor: [30, 30, 30],
-      cellPadding: 2.2,
+      cellPadding: 1.8,
       valign: 'middle',
     },
     columnStyles: {
-      0: { cellWidth: 7, halign: 'center' },
-      1: { cellWidth: 15, halign: 'center' },
-      2: { cellWidth: 62 },
-      3: { cellWidth: 20 },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 10, halign: 'center' },
-      6: { cellWidth: 16, halign: 'right' },
-      7: { cellWidth: 16, halign: 'right' },
-      8: { cellWidth: 16, halign: 'right' },
+      0: { cellWidth: 6, halign: 'center' },   // Sr
+      1: { cellWidth: 13, halign: 'center' },  // SKU
+      2: { cellWidth: 46 },                    // Description
+      3: { cellWidth: 16 },                    // Category
+      4: { cellWidth: 8, halign: 'center' },   // Qty
+      5: { cellWidth: 16 },                    // Unit
+      6: { cellWidth: 15, halign: 'right' },   // Unit Price
+      7: { cellWidth: 14, halign: 'right' },   // Discount
+      8: { cellWidth: 15, halign: 'right' },   // Taxable
+      9: { cellWidth: 10, halign: 'center' },  // GST %
+      10: { cellWidth: 13, halign: 'right' },  // GST Amt
+      11: { cellWidth: 16, halign: 'right' },  // Total
     },
     alternateRowStyles: {
-      fillColor: [252, 253, 255],
+      fillColor: [253, 253, 251],
     },
   });
 
-  let finalY = doc.lastAutoTable.finalY + 6;
-  if (finalY > 200) {
+  let finalY = doc.lastAutoTable.finalY + 4;
+  if (finalY > 195) {
     doc.addPage();
-    finalY = 22;
+    finalY = 20;
   }
 
   // Financial summary
-  const summaryBoxWidth = 88;
+  const summaryBoxWidth = 86;
   const summaryX = pageWidth - margin - summaryBoxWidth;
-  const summaryBoxHeight = 52;
+  const summaryBoxHeight = 54;
 
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(summaryX, finalY, summaryBoxWidth, summaryBoxHeight, 1.5, 1.5, 'FD');
+  doc.roundedRect(summaryX, finalY, summaryBoxWidth, summaryBoxHeight, 1.2, 1.2, 'FD');
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
 
-  let sumY = finalY + 5.5;
-  doc.text('Gross Subtotal:', summaryX + 4, sumY);
-  doc.text(`Rs. ${calc.subtotal.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  let sumY = finalY + 5;
+  doc.text('Subtotal (Gross):', summaryX + 3.5, sumY);
+  doc.text(`Rs. ${calc.subtotal.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 5;
-  doc.text(`Wholesale Discount (${calc.discountPercent}):`, summaryX + 4, sumY);
+  sumY += 4.5;
+  doc.text(`Wholesale Discount (${calc.discountPercent}):`, summaryX + 3.5, sumY);
   doc.setTextColor(16, 120, 70);
-  doc.text(`- Rs. ${calc.discount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  doc.text(`- Rs. ${calc.discount.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 5;
+  sumY += 4.5;
   doc.setTextColor(71, 85, 105);
-  doc.text('Net Taxable Value:', summaryX + 4, sumY);
-  doc.text(`Rs. ${calc.taxableAmount.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  doc.text('Net Taxable Amount:', summaryX + 3.5, sumY);
+  doc.text(`Rs. ${calc.taxableAmount.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 5;
-  doc.text(`CGST (${calc.cgstPercent}):`, summaryX + 4, sumY);
-  doc.text(`Rs. ${calc.cgst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  sumY += 4.5;
+  doc.text(`CGST (${calc.cgstPercent}):`, summaryX + 3.5, sumY);
+  doc.text(`Rs. ${calc.cgst.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 5;
-  doc.text(`SGST (${calc.sgstPercent}):`, summaryX + 4, sumY);
-  doc.text(`Rs. ${calc.sgst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  sumY += 4.5;
+  doc.text(`SGST (${calc.sgstPercent}):`, summaryX + 3.5, sumY);
+  doc.text(`Rs. ${calc.sgst.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 5;
-  doc.text(`Total Statutory GST (${calc.gstPercent}):`, summaryX + 4, sumY);
-  doc.text(`Rs. ${calc.gst.toFixed(2)}`, pageWidth - margin - 4, sumY, { align: 'right' });
+  sumY += 4.5;
+  doc.text(`Total Statutory GST (5.0%):`, summaryX + 3.5, sumY);
+  doc.text(`Rs. ${calc.gst.toFixed(2)}`, pageWidth - margin - 3.5, sumY, { align: 'right' });
 
-  sumY += 4;
+  sumY += 4.5;
+  doc.text(`Eco Courier Delivery:`, summaryX + 3.5, sumY);
+  doc.setTextColor(16, 120, 70);
+  doc.text('FREE (Complimentary)', pageWidth - margin - 3.5, sumY, { align: 'right' });
+
+  sumY += 3.5;
   doc.setDrawColor(203, 213, 225);
-  doc.line(summaryX + 3, sumY - 1, pageWidth - margin - 3, sumY - 1);
+  doc.line(summaryX + 2, sumY - 0.5, pageWidth - margin - 2, sumY - 0.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text('GRAND TOTAL:', summaryX + 4, sumY + 3.5);
-  doc.text(`Rs. ${calc.grandTotal.toFixed(2)}`, pageWidth - margin - 4, sumY + 3.5, { align: 'right' });
+  doc.text('GRAND TOTAL:', summaryX + 3.5, sumY + 4);
+  doc.text(`Rs. ${calc.grandTotal.toFixed(2)}`, pageWidth - margin - 3.5, sumY + 4, { align: 'right' });
+
+  // Left Column Amount in Words
+  const leftColWidth = contentWidth - summaryBoxWidth - 5;
+  doc.setFillColor(245, 247, 250);
+  doc.roundedRect(margin, finalY, leftColWidth, 11, 1.2, 1.2, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text('AMOUNT IN WORDS (INR):', margin + 3, finalY + 3.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  const splitWords = doc.splitTextToSize(calc.amountInWords, leftColWidth - 6);
+  doc.text(splitWords.slice(0, 2), margin + 3, finalY + 7.5);
 
   // Footers
   const totalPages = doc.getNumberOfPages();
@@ -424,7 +499,6 @@ async function runTestSuite() {
     { item: CATALOG[0], quantity: 2 },
     { item: CATALOG[1], quantity: 3 },
   ], 'Event Planner');
-  // Subtotal: 1260, Discount 15%: 189, Taxable: 1071, GST 5%: 53.55, Grand Total: 1124.55
   assert(
     t3Calc.subtotal === 1260 &&
     t3Calc.discount === 189 &&
@@ -443,12 +517,13 @@ async function runTestSuite() {
     `CGST (2.5%): Rs. ${t3Calc.cgst} + SGST (2.5%): Rs. ${t3Calc.sgst} === Total GST: Rs. ${t3Calc.gst}`
   );
 
-  // TEST 5: Correct grand total mathematical integrity
+  // TEST 5: Amount in Words generation & mathematical consistency
+  const wordsCheck = t3Calc.amountInWords.includes('Rupees One Thousand One Hundred Twenty-Four and Fifty-Five Paise Only');
   const t5MathCheck = (t3Calc.taxableAmountPaise + t3Calc.gstPaise) === t3Calc.grandTotalPaise;
   assert(
-    t5MathCheck,
-    'TEST 5: Integer paise mathematical consistency',
-    `Taxable: ${t3Calc.taxableAmountPaise}p + GST: ${t3Calc.gstPaise}p === Total: ${t3Calc.grandTotalPaise}p`
+    t5MathCheck && wordsCheck,
+    'TEST 5: Integer paise consistency & legal amount in words',
+    `Total: ${t3Calc.grandTotalPaise}p (${t3Calc.amountInWords})`
   );
 
   // TEST 6: Empty cart validation
@@ -539,7 +614,6 @@ async function runTestSuite() {
 
   // TEST 11: PDF text extraction and verification
   const pdfBuffer = fs.readFileSync(testPdfPath);
-  const { PDFParse } = require('pdf-parse');
   const parser = new PDFParse(new Uint8Array(pdfBuffer));
   const parsedPdf = await parser.getText();
   const extractedText = parsedPdf.text;
@@ -586,7 +660,6 @@ async function runTestSuite() {
     gst: 22.5,
     finalTotal: 472.5,
   };
-  // Re-download uses original snapshot
   assert(
     originalSnapshot.finalTotal === 472.5 && originalSnapshot.invoiceNumber === 'INV-2026-0001',
     'TEST 14: Historical re-download preserves immutable order snapshot across catalog changes',
@@ -602,6 +675,9 @@ async function runTestSuite() {
     'TEST 15: Inventory decrements atomically by exact ordered quantity',
     `Initial: 15, Purchased: 3, Remaining: ${inventoryStock}`
   );
+
+  // Clean test file
+  fs.unlinkSync(testPdfPath);
 
   console.log('\n====================================================');
   console.log(`TEST SUITE RESULTS: ${passed}/${total} TESTS PASSED (100% SUCCESS)`);
