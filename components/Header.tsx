@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Menu, X, Sparkles } from 'lucide-react';
+import { ShoppingBag, Menu, X, Sparkles, LayoutDashboard } from 'lucide-react';
 import { getStoredCart } from '@/lib/store';
 
 export const Header: React.FC = () => {
@@ -27,23 +27,22 @@ export const Header: React.FC = () => {
     };
   }, []);
 
-  // Close mobile drawer on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
   const navLinks = [
-    { label: 'Home', href: '/' },
-    { label: 'Shop', href: '/shop' },
-    { label: 'About', href: '/about' },
-    { label: 'Billing', href: '/bloombox' },
-    { label: 'Contact', href: '/contact' },
+    { label: 'HOME', href: '/' },
+    { label: 'SHOP', href: '/shop' },
+    { label: 'COLLECTION', href: '/shop#collection' },
+    { label: 'ABOUT', href: '/about' },
+    { label: 'CONTACT', href: '/contact' },
   ];
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-6 py-5 custom:px-12 custom:py-7 bg-black/40 backdrop-blur-md border-b border-[#f5efe2]/10 transition-all duration-300">
-        {/* Brand wordmark */}
+      <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-6 py-5 custom:px-12 custom:py-6 bg-black/35 backdrop-blur-md border-b border-[#f5efe2]/10 transition-all duration-300">
+        {/* Left: BloomBox wordmark and floral icon */}
         <Link
           href="/"
           className="group flex items-center gap-2.5 text-[#f5efe2] transition-colors hover:text-white"
@@ -59,18 +58,18 @@ export const Header: React.FC = () => {
           </span>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-9 custom:flex" aria-label="Main Navigation">
+        {/* Centre: Desktop Navigation */}
+        <nav className="hidden items-center gap-8 custom:flex" aria-label="Main Navigation">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
               <Link
-                key={link.href}
+                key={link.label}
                 href={link.href}
-                className={`text-[13.5px] font-medium tracking-[0.08em] uppercase transition-all duration-300 ${
+                className={`text-[12.5px] font-medium tracking-[0.14em] uppercase transition-all duration-300 ${
                   isActive
-                    ? 'text-white border-b-2 border-[#f5efe2] pb-1'
-                    : 'text-[#f5efe2]/70 hover:text-[#f5efe2]'
+                    ? 'text-white border-b border-[#f5efe2] pb-0.5'
+                    : 'text-[#f5efe2]/75 hover:text-white'
                 }`}
               >
                 {link.label}
@@ -79,8 +78,18 @@ export const Header: React.FC = () => {
           })}
         </nav>
 
-        {/* Right Actions: Cart & CTA */}
+        {/* Right: Cart, Admin & Order Portal Button */}
         <div className="flex items-center gap-4">
+          {/* Admin link */}
+          <Link
+            href="/admin"
+            className="hidden lg:flex items-center gap-1.5 text-xs text-[#f5efe2]/60 hover:text-white transition-colors"
+            title="Management Dashboard"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span className="text-[11px] uppercase tracking-wider">Admin</span>
+          </Link>
+
           {/* Cart Icon */}
           <Link
             href="/shop"
@@ -95,15 +104,15 @@ export const Header: React.FC = () => {
             )}
           </Link>
 
-          {/* Quick Billing CTA */}
+          {/* Order Portal CTA button */}
           <Link
             href="/bloombox"
-            className="hidden sm:inline-flex h-[42px] items-center justify-center rounded-full bg-[#f5efe2] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#151510] transition-all duration-300 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+            className="hidden sm:inline-flex h-[42px] items-center justify-center rounded-full bg-[#f5efe2] px-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#151510] transition-all duration-300 hover:bg-white hover:scale-[1.02] active:scale-[0.98] shadow-md"
           >
             Order Portal
           </Link>
 
-          {/* Mobile Menu Toggle Button */}
+          {/* Mobile Menu Toggle */}
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -115,7 +124,7 @@ export const Header: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-30 flex flex-col justify-between bg-black/95 backdrop-blur-xl px-8 pt-28 pb-12 custom:hidden animate-fade-in">
           <nav className="flex flex-col gap-6">
@@ -123,10 +132,10 @@ export const Header: React.FC = () => {
               const isActive = pathname === link.href;
               return (
                 <Link
-                  key={link.href}
+                  key={link.label}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`text-2xl font-antonio tracking-wide uppercase transition-colors ${
+                  className={`text-2xl font-antonio tracking-wider uppercase transition-colors ${
                     isActive ? 'text-[#f5efe2]' : 'text-[#f5efe2]/50 hover:text-white'
                   }`}
                 >
@@ -134,18 +143,25 @@ export const Header: React.FC = () => {
                 </Link>
               );
             })}
+            <Link
+              href="/admin"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-lg font-antonio tracking-wider uppercase text-[#f5efe2]/40 hover:text-white flex items-center gap-2 pt-2 border-t border-white/10"
+            >
+              <LayoutDashboard className="w-4 h-4" /> Admin Dashboard
+            </Link>
           </nav>
 
           <div className="border-t border-[#f5efe2]/15 pt-6 space-y-4">
             <Link
               href="/bloombox"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex h-12 w-full items-center justify-center rounded-full bg-[#f5efe2] text-sm font-semibold uppercase tracking-wider text-[#151510]"
+              className="flex h-12 w-full items-center justify-center rounded-full bg-[#f5efe2] text-xs font-semibold uppercase tracking-wider text-[#151510]"
             >
               Order &amp; Billing Portal
             </Link>
-            <p className="text-xs text-[#f5efe2]/40 text-center">
-              BloomBox Regenerative Floral Design Studio
+            <p className="text-[11px] text-[#f5efe2]/40 text-center">
+              BloomBox Regenerative Botanical Studio
             </p>
           </div>
         </div>

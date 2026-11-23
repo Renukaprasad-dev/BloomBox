@@ -11,11 +11,13 @@ import {
   saveStoredCart,
   getStoredInventory,
 } from '@/lib/store';
-import { ShoppingBag, Plus, Minus, Trash2, ArrowRight, Check, AlertCircle } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, Trash2, ArrowRight, Check, Search, Filter } from 'lucide-react';
 
 export default function ShopPage() {
   const [items, setItems] = useState<FlowerItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function ShopPage() {
         if (c.item.id === productId) {
           const newQty = c.quantity + delta;
           if (newQty > c.item.stock) {
-            showNotification(`Cannot exceed available stock of ${c.item.stock}.`);
+            showNotification(`Cannot exceed greenhouse stock of ${c.item.stock}.`);
             return c;
           }
           return newQty > 0 ? { ...c, quantity: newQty } : null;
@@ -83,6 +85,17 @@ export default function ShopPage() {
     showNotification('Item removed from cart.');
   };
 
+  const categories = ['All', 'Bouquet', 'Garland', 'Loose', 'Stem', 'Decor'];
+
+  const filteredItems = items.filter((item) => {
+    const matchesCat = selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(item.id).includes(searchQuery);
+    return matchesCat && matchesSearch;
+  });
+
   const cartSubtotal = cart.reduce(
     (sum, c) => sum + c.item.price * c.quantity,
     0
@@ -92,19 +105,50 @@ export default function ShopPage() {
     <div className="min-h-screen bg-[#05070a] text-[#f5efe2] font-manrope selection:bg-[#f5efe2] selection:text-[#151510] flex flex-col justify-between">
       <Header />
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto w-full px-6 pt-32 pb-20 custom:px-12">
-        {/* Page Title & Subtitle */}
-        <div className="mb-12">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f5efe2]/50 block mb-2">
-            Seasonal Botanical Catalog
+      <main className="max-w-7xl mx-auto w-full px-6 pt-32 pb-24 custom:px-12">
+        {/* Header Banner */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f5efe2]/50 block mb-2">
+              Curated Botanical Catalog
+            </span>
+            <h1 className="font-antonio text-5xl custom:text-7xl text-white tracking-wide">
+              Flower Shop
+            </h1>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-[#f5efe2]/40" />
+            <input
+              type="text"
+              placeholder="Search roses, jasmine, orchids..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-black/60 border border-[#f5efe2]/20 text-xs text-white focus:outline-none focus:border-white"
+            />
+          </div>
+        </div>
+
+        {/* Category Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 mb-10 border-b border-white/10 pb-4">
+          <span className="text-xs uppercase tracking-wider text-[#f5efe2]/40 mr-2 flex items-center gap-1">
+            <Filter className="w-3 h-3" /> Categories:
           </span>
-          <h1 className="font-antonio text-5xl custom:text-7xl text-white tracking-wide">
-            Flower Shop
-          </h1>
-          <p className="mt-3 text-sm custom:text-base text-[#f5efe2]/70 max-w-xl">
-            Choose from our 6 certified nocturnal arrangements. Quantities directly reflect active greenhouse stock.
-          </p>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium uppercase tracking-wider transition-all ${
+                selectedCategory === cat
+                  ? 'bg-[#f5efe2] text-[#151510] shadow-md font-semibold'
+                  : 'bg-white/5 border border-white/10 text-[#f5efe2]/70 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
         {/* Toast Notification */}
@@ -115,90 +159,92 @@ export default function ShopPage() {
           </div>
         )}
 
-        {/* 2-Column Layout: Catalog Grid + Cart Summary Sidebar */}
+        {/* 2-Column Catalog Grid & Sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          {/* Products Grid (8 Cols) */}
           <div className="lg:col-span-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {items.map((product) => {
-                const available = getAvailableStock(product);
-                const isOutOfStock = available <= 0;
+            {filteredItems.length === 0 ? (
+              <div className="py-20 text-center text-[#f5efe2]/40 text-xs italic">
+                No floral arrangements found matching your query.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {filteredItems.map((product) => {
+                  const available = getAvailableStock(product);
+                  const isOutOfStock = available <= 0;
 
-                return (
-                  <div
-                    key={product.id}
-                    className="group rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/80 p-6 backdrop-blur-md transition-all duration-300 hover:border-[#f5efe2]/40 flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Product Header */}
-                      <div className="flex items-center justify-between text-xs text-[#f5efe2]/60 mb-4">
-                        <span className="font-mono">#{product.id}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-[#f5efe2]/80">
-                            {product.category}
-                          </span>
-                          {product.stock <= 8 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-red-950/60 border border-red-500/40 text-[10px] text-red-300">
-                              LOW ({available})
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[10px] text-emerald-300">
-                              OK ({available})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Visual Header */}
-                      <div
-                        className={`h-40 w-full rounded-2xl bg-gradient-to-br ${product.imageColor} border border-white/10 flex items-center justify-center p-5 mb-5 relative overflow-hidden`}
-                      >
-                        <div
-                          className="absolute inset-0 opacity-25 blur-lg"
-                          style={{ backgroundColor: product.accentColor }}
-                        />
-                        <h3 className="font-antonio text-2xl tracking-wide text-white text-center relative z-10">
-                          {product.name}
-                        </h3>
-                      </div>
-
-                      <p className="text-xs text-[#f5efe2]/70 leading-relaxed mb-6">
-                        {product.description}
-                      </p>
-                    </div>
-
-                    {/* Price & Action */}
-                    <div className="border-t border-[#f5efe2]/10 pt-4 flex items-center justify-between">
+                  return (
+                    <div
+                      key={product.id}
+                      className="group rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/80 p-6 backdrop-blur-md transition-all duration-300 hover:border-[#f5efe2]/40 flex flex-col justify-between"
+                    >
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-[#f5efe2]/50 block">Price</span>
-                        <span className="font-mono text-xl font-bold text-white">₹{product.price}</span>
+                        <div className="flex items-center justify-between text-xs text-[#f5efe2]/60 mb-4">
+                          <span className="font-mono">#{product.id}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-[#f5efe2]/80">
+                              {product.category}
+                            </span>
+                            {product.stock <= 8 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-950/60 border border-red-500/40 text-[10px] text-red-300 font-semibold">
+                                LOW ({available})
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[10px] text-emerald-300 font-semibold">
+                                OK ({available})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`h-40 w-full rounded-2xl bg-gradient-to-br ${product.imageColor} border border-white/10 flex items-center justify-center p-5 mb-5 relative overflow-hidden`}
+                        >
+                          <div
+                            className="absolute inset-0 opacity-25 blur-lg"
+                            style={{ backgroundColor: product.accentColor }}
+                          />
+                          <h3 className="font-antonio text-2xl tracking-wide text-white text-center relative z-10">
+                            {product.name}
+                          </h3>
+                        </div>
+
+                        <p className="text-xs text-[#f5efe2]/70 leading-relaxed mb-6">
+                          {product.description}
+                        </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(product)}
-                        disabled={isOutOfStock}
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#f5efe2] px-5 text-xs font-semibold uppercase tracking-wider text-[#151510] hover:bg-white active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>{isOutOfStock ? 'Sold Out' : 'Add to Cart'}</span>
-                      </button>
+                      <div className="border-t border-[#f5efe2]/10 pt-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-[#f5efe2]/50 block">Price</span>
+                          <span className="font-mono text-xl font-bold text-white">₹{product.price}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddToCart(product)}
+                          disabled={isOutOfStock}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#f5efe2] px-5 text-xs font-semibold uppercase tracking-wider text-[#151510] hover:bg-white active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{isOutOfStock ? 'Sold Out' : 'Add to Cart'}</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Cart Sidebar (4 Cols) */}
+          {/* Cart Sidebar */}
           <div className="lg:col-span-4">
-            <div className="sticky top-28 rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/90 p-6 backdrop-blur-md shadow-2xl flex flex-col justify-between min-h-[440px]">
+            <div className="sticky top-28 rounded-3xl border border-[#f5efe2]/15 bg-[#0a0d14]/90 p-6 backdrop-blur-md shadow-2xl flex flex-col justify-between min-h-[460px]">
               <div>
                 <div className="flex items-center justify-between border-b border-[#f5efe2]/10 pb-4 mb-4">
                   <h3 className="font-antonio text-2xl tracking-wide text-white flex items-center gap-2">
                     <ShoppingBag className="w-5 h-5 text-[#f5efe2]" /> Order Basket
                   </h3>
-                  <span className="text-xs text-[#f5efe2]/60">
+                  <span className="text-xs text-[#f5efe2]/60 font-mono">
                     {cart.reduce((s, c) => s + c.quantity, 0)} items
                   </span>
                 </div>
@@ -206,10 +252,10 @@ export default function ShopPage() {
                 {cart.length === 0 ? (
                   <div className="py-16 text-center text-[#f5efe2]/40 text-xs italic">
                     <p>Your basket is currently empty.</p>
-                    <p className="mt-1">Add items from the catalog to prepare your order.</p>
+                    <p className="mt-1">Select flora from the catalog to prepare your invoice.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[320px] overflow-y-auto pr-1">
+                  <div className="space-y-3.5 max-h-[320px] overflow-y-auto pr-1">
                     {cart.map((c) => (
                       <div
                         key={c.item.id}
@@ -222,7 +268,6 @@ export default function ShopPage() {
                           </span>
                         </div>
 
-                        {/* Qty Controls */}
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -244,10 +289,10 @@ export default function ShopPage() {
                           <button
                             type="button"
                             onClick={() => handleRemoveFromCart(c.item.id)}
-                            className="h-6 w-6 rounded-md text-red-400 hover:text-red-300 hover:bg-red-950/40 flex items-center justify-center ml-1"
+                            className="h-6 w-6 text-red-400 hover:text-red-300 ml-1"
                             title="Remove"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -256,7 +301,6 @@ export default function ShopPage() {
                 )}
               </div>
 
-              {/* Basket Footer & Checkout */}
               <div className="border-t border-[#f5efe2]/10 pt-5 mt-6 space-y-4">
                 <div className="flex justify-between text-sm text-[#f5efe2]/70">
                   <span>Basket Subtotal</span>
@@ -264,14 +308,14 @@ export default function ShopPage() {
                 </div>
 
                 <p className="text-[11px] text-[#f5efe2]/50 leading-relaxed">
-                  Taxes (5% GST) and customer discounts (15% Event Planner) are calculated at the billing portal.
+                  Event Planner 15% wholesale allowance and 5% GST calculated at checkout.
                 </p>
 
                 <Link
                   href="/bloombox"
                   className={`w-full h-12 rounded-full font-semibold uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition-all ${
                     cart.length > 0
-                      ? 'bg-[#f5efe2] text-[#151510] hover:bg-white active:scale-95 shadow-[0_0_25px_rgba(245,239,226,0.2)]'
+                      ? 'bg-[#f5efe2] text-[#151510] hover:bg-white active:scale-95 shadow-[0_0_25px_rgba(245,239,226,0.25)]'
                       : 'bg-white/10 text-[#f5efe2]/40 pointer-events-none'
                   }`}
                 >

@@ -18,12 +18,17 @@ export interface CartItem {
 
 export interface CompletedOrder {
   orderId: string;
+  invoiceNumber: string;
   token: number;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  billingAddress?: string;
   customerType: 'Regular' | 'Event Planner';
   lines: CartItem[];
   subtotal: number;
   discount: number;
+  taxableAmount: number;
   gst: number;
   finalTotal: number;
   rider: string;
@@ -93,9 +98,9 @@ export const INITIAL_PRODUCTS: FlowerItem[] = [
   },
 ];
 
-const CART_STORAGE_KEY = 'bloombox_cart_items_v1';
-const INVENTORY_STORAGE_KEY = 'bloombox_inventory_v1';
-const ORDERS_STORAGE_KEY = 'bloombox_orders_v1';
+const CART_STORAGE_KEY = 'bloombox_cart_items_v2';
+const INVENTORY_STORAGE_KEY = 'bloombox_inventory_v2';
+const ORDERS_STORAGE_KEY = 'bloombox_orders_v2';
 
 export function getStoredCart(): CartItem[] {
   if (typeof window === 'undefined') return [];
@@ -151,6 +156,7 @@ export function saveStoredOrders(orders: CompletedOrder[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+    window.dispatchEvent(new Event('bloombox_orders_updated'));
   } catch (e) {
     console.error('Failed to save orders to localStorage', e);
   }

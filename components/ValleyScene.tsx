@@ -8,32 +8,12 @@ interface ValleySceneProps {
   isCtaHovered?: boolean;
 }
 
-// Simplex-style smooth noise for terrain elevation
-function terrainElevation(x: number, z: number): number {
-  // Center valley trough: lower elevation along x near 0
-  const valleyWidth = 28;
-  const distFromCenter = Math.abs(x);
-  const valleyFactor = Math.pow(Math.min(distFromCenter / valleyWidth, 1.8), 2.2);
-
-  // Layered sinusoidal hills
-  const hill1 = Math.sin(x * 0.04) * Math.cos(z * 0.03) * 14;
-  const hill2 = Math.cos(x * 0.08 + 1.2) * Math.sin(z * 0.06) * 6;
-  const ridge = Math.sin(x * 0.015 - z * 0.01) * 18;
-
-  // Base elevation: hills rise higher as we move away from center x
-  const baseElev = valleyFactor * 32 - 6;
-
-  return baseElev + hill1 + hill2 + ridge;
-}
-
 export const ValleyScene: React.FC<ValleySceneProps> = ({
   onLoaded,
   isCtaHovered = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [webGlSupported, setWebGlSupported] = useState(true);
-
-  // Scene references
   const isCtaHoveredRef = useRef(isCtaHovered);
   isCtaHoveredRef.current = isCtaHovered;
 
@@ -65,12 +45,11 @@ export const ValleyScene: React.FC<ValleySceneProps> = ({
 
     // 1. Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    // Deep nocturnal fog
-    scene.fog = new THREE.FogExp2(0x020306, 0.0075);
+    scene.background = new THREE.Color(0x020306);
+    scene.fog = new THREE.FogExp2(0x04060a, 0.018);
 
-    const camera = new THREE.PerspectiveCamera(46, width / height, 0.1, 900);
-    camera.position.set(0, 7.5, 0);
+    const camera = new THREE.PerspectiveCamera(48, width / height, 0.1, 300);
+    camera.position.set(0, 3.2, 14);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -80,262 +59,404 @@ export const ValleyScene: React.FC<ValleySceneProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.35;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0x0d141e, 1.2);
+    // 2. Cinematic Lighting
+    // Ambient fill
+    const ambientLight = new THREE.AmbientLight(0x1a2233, 1.4);
     scene.add(ambientLight);
 
-    // Moonlight: cool directional light grazing the valley ridges
-    const moonLight = new THREE.DirectionalLight(0x4a6fa5, 1.4);
-    moonLight.position.set(40, 90, -50);
+    // Central Warm Architectural Focal Spotlight (from archway)
+    const portalSpot = new THREE.SpotLight(0xffdfa8, 4.5, 45, Math.PI / 4, 0.5, 1.2);
+    portalSpot.position.set(0, 9, -12);
+    portalSpot.target.position.set(0, 1.5, 0);
+    scene.add(portalSpot);
+    scene.add(portalSpot.target);
+
+    // Cool Moonlight grazing the flower banks
+    const moonLight = new THREE.DirectionalLight(0x6b8cff, 1.8);
+    moonLight.position.set(16, 22, 18);
     scene.add(moonLight);
 
-    // Soft camera lantern to illuminate foreground flowers
-    const cameraLantern = new THREE.PointLight(0xf5efe2, 1.8, 45, 1.4);
-    scene.add(cameraLantern);
+    // Soft foreground fill for front petals
+    const frontFill = new THREE.PointLight(0xffe6d0, 1.2, 25);
+    frontFill.position.set(0, 4, 8);
+    scene.add(frontFill);
 
-    // 3. Terrain Generation
-    const terrainGeo = new THREE.PlaneGeometry(360, 600, 140, 200);
-    terrainGeo.rotateX(-Math.PI / 2);
+    // 3. Central Architectural Stone Archway & Pathway
+    // Dark cobblestone/soil central pathway
+    const pathGeo = new THREE.PlaneGeometry(7.5, 50, 20, 40);
+    pathGeo.rotateX(-Math.PI / 2);
+    const pathMat = new THREE.MeshStandardMaterial({
+      color: 0x08090c,
+      roughness: 0.95,
+      metalness: 0.05,
+    });
+    const pathMesh = new THREE.Mesh(pathGeo, pathMat);
+    pathMesh.position.set(0, 0.02, -8);
+    scene.add(pathMesh);
 
-    const posAttr = terrainGeo.attributes.position;
-    for (let i = 0; i < posAttr.count; i++) {
-      const vx = posAttr.getX(i);
-      const vz = posAttr.getZ(i);
-      const vy = terrainElevation(vx, vz);
-      posAttr.setY(i, vy);
+    // Flanking elevated garden soil beds
+    const groundGeo = new THREE.PlaneGeometry(60, 50, 40, 40);
+    groundGeo.rotateX(-Math.PI / 2);
+    const gPos = groundGeo.attributes.position;
+    for (let i = 0; i < gPos.count; i++) {
+      const vx = gPos.getX(i);
+      const vz = gPos.getZ(i);
+      // Rise into flower banks away from central path (|x| > 3.5)
+      const distFromCenter = Math.max(0, Math.abs(vx) - 3.2);
+      const elev = Math.min(Math.pow(distFromCenter * 0.45, 1.4) + Math.sin(vz * 0.2) * 0.4, 4.5);
+      gPos.setY(i, elev);
     }
-    terrainGeo.computeVertexNormals();
+    groundGeo.computeVertexNormals();
 
-    const terrainMat = new THREE.MeshStandardMaterial({
-      color: 0x05070a,
-      roughness: 0.92,
-      metalness: 0.08,
-      flatShading: false,
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x040608,
+      roughness: 0.98,
+      metalness: 0.02,
+    });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.position.set(0, 0, -8);
+    scene.add(groundMesh);
+
+    // Classical Architectural Archway in background
+    const archGroup = new THREE.Group();
+    const columnGeo = new THREE.CylinderGeometry(0.55, 0.65, 12, 16);
+    const archMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0c12,
+      roughness: 0.85,
+      metalness: 0.15,
     });
 
-    const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
-    terrainMesh.position.set(0, 0, -180);
-    scene.add(terrainMesh);
+    const leftCol = new THREE.Mesh(columnGeo, archMat);
+    leftCol.position.set(-4.2, 6, -14);
+    const rightCol = new THREE.Mesh(columnGeo, archMat);
+    rightCol.position.set(4.2, 6, -14);
 
-    // 4. Glowing Flower Meadow
-    const isMobile = width < 820;
-    const FLOWER_COUNT = isMobile ? 2400 : 4200;
+    const archTopGeo = new THREE.TorusGeometry(4.2, 0.6, 12, 24, Math.PI);
+    const archTop = new THREE.Mesh(archTopGeo, archMat);
+    archTop.position.set(0, 11.5, -14);
+    archTop.rotation.z = 0;
 
-    // Palette: Pink, Violet, Lavender, Warm Cream, Subtle Cyan
-    const flowerColors = [
-      new THREE.Color('#ff4b93'), // Pink
-      new THREE.Color('#ff75a0'), // Soft Rose Pink
-      new THREE.Color('#8e44ad'), // Deep Violet
-      new THREE.Color('#b39ddb'), // Lavender
-      new THREE.Color('#f5efe2'), // Warm Cream
-      new THREE.Color('#ffe8cc'), // Amber Cream
-      new THREE.Color('#4dd0e1'), // Cyan Luminescence
-    ];
+    archGroup.add(leftCol, rightCol, archTop);
+    scene.add(archGroup);
 
-    // Flower Blossom Geometry (5-petal star blossom)
-    const petalCount = 5;
-    const petalShape = new THREE.Shape();
-    petalShape.moveTo(0, 0);
-    for (let i = 0; i < petalCount * 2; i++) {
-      const radius = i % 2 === 0 ? 0.38 : 0.16;
-      const angle = (i / (petalCount * 2)) * Math.PI * 2;
-      petalShape.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-    }
-    petalShape.closePath();
+    // Golden inner lantern inside archway
+    const lanternGeo = new THREE.SphereGeometry(0.45, 16, 16);
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0xffdfa8 });
+    const lanternMesh = new THREE.Mesh(lanternGeo, lanternMat);
+    lanternMesh.position.set(0, 9.8, -13.8);
+    scene.add(lanternMesh);
 
-    const blossomGeo = new THREE.ShapeGeometry(petalShape, 4);
-    blossomGeo.rotateX(-Math.PI / 2);
+    // 4. Detailed Flower Geometries & Instancing
+    const dummy = new THREE.Object3D();
 
-    const blossomMat = new THREE.MeshStandardMaterial({
+    // ----------------- FLOWER 1: ROSE (Multi-layered cup petals) -----------------
+    const roseGroupGeo = new THREE.BufferGeometry();
+    // Rose Blossom: 3 overlapping cup petal tiers
+    const rosePetalGeo = new THREE.CylinderGeometry(0.38, 0.12, 0.45, 7, 1, true);
+    rosePetalGeo.rotateX(0.15);
+    const roseMat = new THREE.MeshStandardMaterial({
       roughness: 0.45,
-      metalness: 0.1,
+      metalness: 0.05,
       side: THREE.DoubleSide,
     });
+    const ROSE_COUNT = 380;
+    const roseMesh = new THREE.InstancedMesh(rosePetalGeo, roseMat, ROSE_COUNT);
 
-    // Glowing Flower Center Geometry
-    const centerGeo = new THREE.SphereGeometry(0.12, 8, 8);
-    const centerMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      toneMapped: false,
+    // Rose stem & leaf
+    const stemGeo = new THREE.CylinderGeometry(0.035, 0.045, 1.4, 6);
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0x1b3b22,
+      roughness: 0.8,
     });
+    const roseStemMesh = new THREE.InstancedMesh(stemGeo, stemMat, ROSE_COUNT);
 
-    // Instanced Meshes
-    const blossomInstanced = new THREE.InstancedMesh(blossomGeo, blossomMat, FLOWER_COUNT);
-    const centerInstanced = new THREE.InstancedMesh(centerGeo, centerMat, FLOWER_COUNT);
-
-    // Flower Data Store for dynamic animations
-    interface FlowerData {
-      baseX: number;
-      baseY: number;
-      baseZ: number;
-      baseScale: number;
-      currentScale: number;
-      color: THREE.Color;
-      rotationY: number;
-      tiltX: number;
-      tiltZ: number;
-    }
-
-    const flowers: FlowerData[] = [];
-    const dummy = new THREE.Object3D();
-    const colorDummy = new THREE.Color();
-
-    // Distribute flowers organically across the valley
-    for (let i = 0; i < FLOWER_COUNT; i++) {
-      // Clustered towards valley floor and lower hill gradients
-      const u = Math.random();
-      const spreadX = (Math.pow(u, 1.8) * 2 - 1) * 75; // -75 to 75 with concentration in middle
-      const spreadZ = -Math.random() * 520 + 40; // -480 to 40 along path
-      const y = terrainElevation(spreadX, spreadZ - 180) + 0.35; // slightly above ground
-
-      const chosenColor = flowerColors[Math.floor(Math.random() * flowerColors.length)].clone();
-      // Slight individual color variance
-      chosenColor.offsetHSL((Math.random() - 0.5) * 0.05, 0, (Math.random() - 0.5) * 0.08);
-
-      const baseScale = 0.55 + Math.random() * 0.75;
-
-      flowers.push({
-        baseX: spreadX,
-        baseY: y,
-        baseZ: spreadZ,
-        baseScale,
-        currentScale: baseScale * 0.2, // starts closed/unbloomed until camera approaches
-        color: chosenColor,
-        rotationY: Math.random() * Math.PI * 2,
-        tiltX: (Math.random() - 0.5) * 0.35,
-        tiltZ: (Math.random() - 0.5) * 0.35,
-      });
-
-      // Initial matrix
-      dummy.position.set(spreadX, y, spreadZ);
-      dummy.rotation.set(flowers[i].tiltX, flowers[i].rotationY, flowers[i].tiltZ);
-      dummy.scale.setScalar(flowers[i].currentScale);
-      dummy.updateMatrix();
-
-      blossomInstanced.setMatrixAt(i, dummy.matrix);
-      blossomInstanced.setColorAt(i, chosenColor);
-
-      centerInstanced.setMatrixAt(i, dummy.matrix);
-      // Center color is vibrant cream/white tinted with flower hue
-      colorDummy.copy(chosenColor).lerp(new THREE.Color(0xffffff), 0.7);
-      centerInstanced.setColorAt(i, colorDummy);
-    }
-
-    blossomInstanced.instanceMatrix.needsUpdate = true;
-    if (blossomInstanced.instanceColor) blossomInstanced.instanceColor.needsUpdate = true;
-    centerInstanced.instanceMatrix.needsUpdate = true;
-    if (centerInstanced.instanceColor) centerInstanced.instanceColor.needsUpdate = true;
-
-    scene.add(blossomInstanced);
-    scene.add(centerInstanced);
-
-    // 5. Floating Spores / Atmospheric Dust Particles
-    const PARTICLE_COUNT = isMobile ? 650 : 1300;
-    const particleGeo = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(PARTICLE_COUNT * 3);
-    const particleVelocities = new Float32Array(PARTICLE_COUNT * 3);
-    const particleColors = new Float32Array(PARTICLE_COUNT * 3);
-
-    const sporeColors = [
-      new THREE.Color('#f5efe2'),
-      new THREE.Color('#ff75a0'),
-      new THREE.Color('#4dd0e1'),
-      new THREE.Color('#b39ddb'),
+    const roseColors = [
+      new THREE.Color('#d90429'), // Velvety Crimson
+      new THREE.Color('#ef233c'), // Bright Rose
+      new THREE.Color('#ff4d6d'), // Vivid Pink
+      new THREE.Color('#c9184a'), // Magenta Rose
+      new THREE.Color('#ff758f'), // Soft Blush
+      new THREE.Color('#f5efe2'), // Cream Rose
     ];
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const px = (Math.random() - 0.5) * 120;
-      const py = 1 + Math.random() * 22;
-      const pz = -Math.random() * 500 + 30;
+    // ----------------- FLOWER 2: TULIP (Upright 3D chalice blossom) -----------------
+    const tulipPetalGeo = new THREE.ConeGeometry(0.32, 0.65, 6, 1, true);
+    tulipPetalGeo.rotateX(Math.PI);
+    const tulipMat = new THREE.MeshStandardMaterial({
+      roughness: 0.38,
+      metalness: 0.08,
+      side: THREE.DoubleSide,
+    });
+    const TULIP_COUNT = 340;
+    const tulipMesh = new THREE.InstancedMesh(tulipPetalGeo, tulipMat, TULIP_COUNT);
+    const tulipStemMesh = new THREE.InstancedMesh(stemGeo, stemMat, TULIP_COUNT);
 
-      particlePositions[i * 3] = px;
-      particlePositions[i * 3 + 1] = py;
-      particlePositions[i * 3 + 2] = pz;
+    const tulipColors = [
+      new THREE.Color('#7b2cbf'), // Royal Violet
+      new THREE.Color('#9d4edd'), // Purple
+      new THREE.Color('#ff5400'), // Sunset Tangerine
+      new THREE.Color('#ffb703'), // Golden Tulip
+      new THREE.Color('#f72585'), // Hot Pink
+      new THREE.Color('#f5efe2'), // Ivory
+    ];
 
-      particleVelocities[i * 3] = (Math.random() - 0.5) * 0.02;
-      particleVelocities[i * 3 + 1] = Math.random() * 0.015 + 0.005;
-      particleVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+    // ----------------- FLOWER 3: DAISY / SUNFLOWER (Disk Center + Radial Petals) -----------------
+    // Radial petal star disk
+    const daisyShape = new THREE.Shape();
+    daisyShape.moveTo(0, 0);
+    const dPetals = 12;
+    for (let p = 0; p < dPetals * 2; p++) {
+      const rad = p % 2 === 0 ? 0.48 : 0.18;
+      const ang = (p / (dPetals * 2)) * Math.PI * 2;
+      daisyShape.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+    }
+    daisyShape.closePath();
+    const daisyPetalGeo = new THREE.ShapeGeometry(daisyShape, 4);
+    daisyPetalGeo.rotateX(-Math.PI / 2);
+    const daisyMat = new THREE.MeshStandardMaterial({
+      roughness: 0.4,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+    });
+    const DAISY_COUNT = 420;
+    const daisyMesh = new THREE.InstancedMesh(daisyPetalGeo, daisyMat, DAISY_COUNT);
 
-      const sc = sporeColors[Math.floor(Math.random() * sporeColors.length)];
-      particleColors[i * 3] = sc.r;
-      particleColors[i * 3 + 1] = sc.g;
-      particleColors[i * 3 + 2] = sc.b;
+    // Raised daisy golden center
+    const daisyCenterGeo = new THREE.SphereGeometry(0.14, 8, 8);
+    const daisyCenterMat = new THREE.MeshStandardMaterial({
+      color: 0xffaa00,
+      roughness: 0.6,
+      emissive: 0x884400,
+      emissiveIntensity: 0.4,
+    });
+    const daisyCenterMesh = new THREE.InstancedMesh(daisyCenterGeo, daisyCenterMat, DAISY_COUNT);
+    const daisyStemMesh = new THREE.InstancedMesh(stemGeo, stemMat, DAISY_COUNT);
+
+    const daisyColors = [
+      new THREE.Color('#ffffff'), // Pure White
+      new THREE.Color('#f5efe2'), // Warm Cream
+      new THREE.Color('#ffb703'), // Bright Amber
+      new THREE.Color('#ffcad4'), // Baby Pink
+      new THREE.Color('#bde0fe'), // Cornflower Cyan
+    ];
+
+    // ----------------- FLOWER 4: LAVENDER (Vertical Spikes) -----------------
+    const lavenderSpikeGeo = new THREE.CylinderGeometry(0.12, 0.05, 0.95, 6);
+    const lavenderMat = new THREE.MeshStandardMaterial({
+      roughness: 0.5,
+      emissive: 0x3c096c,
+      emissiveIntensity: 0.25,
+    });
+    const LAVENDER_COUNT = 450;
+    const lavenderMesh = new THREE.InstancedMesh(lavenderSpikeGeo, lavenderMat, LAVENDER_COUNT);
+    const lavenderStemMesh = new THREE.InstancedMesh(stemGeo, stemMat, LAVENDER_COUNT);
+
+    const lavenderColors = [
+      new THREE.Color('#7209b7'),
+      new THREE.Color('#560bad'),
+      new THREE.Color('#3a0ca3'),
+      new THREE.Color('#b5179e'),
+      new THREE.Color('#c77dff'),
+    ];
+
+    // ----------------- FLOWER 5: BROAD LEAVES & FERNS -----------------
+    const leafShape = new THREE.Shape();
+    leafShape.moveTo(0, 0);
+    leafShape.quadraticCurveTo(0.28, 0.5, 0, 1.1);
+    leafShape.quadraticCurveTo(-0.28, 0.5, 0, 0);
+    const leafGeo = new THREE.ShapeGeometry(leafShape, 4);
+    leafGeo.rotateX(-0.6);
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x14341c,
+      roughness: 0.65,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+    });
+    const LEAF_COUNT = 520;
+    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, LEAF_COUNT);
+
+    // Distribution arrays to store dynamic sway offsets
+    interface FlowerInstance {
+      x: number;
+      y: number;
+      z: number;
+      scale: number;
+      rotX: number;
+      rotY: number;
+      rotZ: number;
+      swaySpeed: number;
     }
 
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+    const roseInstances: FlowerInstance[] = [];
+    const tulipInstances: FlowerInstance[] = [];
+    const daisyInstances: FlowerInstance[] = [];
+    const lavenderInstances: FlowerInstance[] = [];
 
-    // Circular glowing particle texture
-    const particleCanvas = document.createElement('canvas');
-    particleCanvas.width = 32;
-    particleCanvas.height = 32;
-    const pCtx = particleCanvas.getContext('2d');
+    // Helper to calculate ground elevation at (x, z)
+    const getGroundY = (x: number, z: number) => {
+      const distFromCenter = Math.max(0, Math.abs(x) - 3.2);
+      return Math.min(Math.pow(distFromCenter * 0.45, 1.4) + Math.sin(z * 0.2) * 0.4, 4.5);
+    };
+
+    // Helper to distribute a flower type on both flanks
+    const populateFlowers = (
+      count: number,
+      instances: FlowerInstance[],
+      mesh: THREE.InstancedMesh,
+      stemMesh: THREE.InstancedMesh,
+      colors: THREE.Color[],
+      heightOffset: number,
+      scaleRange: [number, number]
+    ) => {
+      for (let i = 0; i < count; i++) {
+        // Flank either left (negative x) or right (positive x)
+        const side = i % 2 === 0 ? 1 : -1;
+        const x = side * (3.6 + Math.pow(Math.random(), 1.3) * 16);
+        const z = -22 + Math.random() * 32; // -22 to 10 around camera
+        const groundY = getGroundY(x, z);
+        const y = groundY + heightOffset;
+
+        const scale = scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]);
+        const rotY = Math.random() * Math.PI * 2;
+        const rotX = (Math.random() - 0.5) * 0.25;
+        const rotZ = (Math.random() - 0.5) * 0.25;
+
+        instances.push({
+          x,
+          y,
+          z,
+          scale,
+          rotX,
+          rotY,
+          rotZ,
+          swaySpeed: 1.2 + Math.random() * 1.5,
+        });
+
+        // Set Flower Head Matrix
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(rotX, rotY, rotZ);
+        dummy.scale.setScalar(scale);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+
+        // Color
+        const col = colors[Math.floor(Math.random() * colors.length)];
+        mesh.setColorAt(i, col);
+
+        // Set Stem Matrix
+        dummy.position.set(x, y - 0.65 * scale, z);
+        dummy.rotation.set(rotX * 0.5, rotY, rotZ * 0.5);
+        dummy.scale.set(scale, scale * 1.1, scale);
+        dummy.updateMatrix();
+        stemMesh.setMatrixAt(i, dummy.matrix);
+      }
+
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      stemMesh.instanceMatrix.needsUpdate = true;
+    };
+
+    // Populate all 4 flower varieties
+    populateFlowers(ROSE_COUNT, roseInstances, roseMesh, roseStemMesh, roseColors, 1.25, [1.0, 1.6]);
+    populateFlowers(TULIP_COUNT, tulipInstances, tulipMesh, tulipStemMesh, tulipColors, 1.15, [0.9, 1.5]);
+    populateFlowers(DAISY_COUNT, daisyInstances, daisyMesh, daisyStemMesh, daisyColors, 0.95, [0.85, 1.45]);
+    populateFlowers(LAVENDER_COUNT, lavenderInstances, lavenderMesh, lavenderStemMesh, lavenderColors, 1.05, [0.9, 1.5]);
+
+    // Also set Daisy centers
+    for (let i = 0; i < DAISY_COUNT; i++) {
+      const d = daisyInstances[i];
+      dummy.position.set(d.x, d.y + 0.05 * d.scale, d.z);
+      dummy.rotation.set(d.rotX, d.rotY, d.rotZ);
+      dummy.scale.setScalar(d.scale * 0.9);
+      dummy.updateMatrix();
+      daisyCenterMesh.setMatrixAt(i, dummy.matrix);
+    }
+    daisyCenterMesh.instanceMatrix.needsUpdate = true;
+
+    // Populate Foliage Leaves
+    for (let i = 0; i < LEAF_COUNT; i++) {
+      const side = i % 2 === 0 ? 1 : -1;
+      const x = side * (3.4 + Math.random() * 18);
+      const z = -24 + Math.random() * 34;
+      const y = getGroundY(x, z) + 0.35;
+      const scale = 0.9 + Math.random() * 1.3;
+
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(
+        -0.4 + (Math.random() - 0.5) * 0.4,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.4
+      );
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      leafMesh.setMatrixAt(i, dummy.matrix);
+    }
+    leafMesh.instanceMatrix.needsUpdate = true;
+
+    // Add all meshes to scene
+    scene.add(roseMesh);
+    scene.add(roseStemMesh);
+    scene.add(tulipMesh);
+    scene.add(tulipStemMesh);
+    scene.add(daisyMesh);
+    scene.add(daisyCenterMesh);
+    scene.add(daisyStemMesh);
+    scene.add(lavenderMesh);
+    scene.add(lavenderStemMesh);
+    scene.add(leafMesh);
+
+    // 5. Supplementary Atmospheric Floating Spores (subtle golden pollen)
+    const SPORE_COUNT = 300;
+    const sporeGeo = new THREE.BufferGeometry();
+    const sporePositions = new Float32Array(SPORE_COUNT * 3);
+    for (let i = 0; i < SPORE_COUNT; i++) {
+      sporePositions[i * 3] = (Math.random() - 0.5) * 28;
+      sporePositions[i * 3 + 1] = 0.8 + Math.random() * 8;
+      sporePositions[i * 3 + 2] = -20 + Math.random() * 30;
+    }
+    sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePositions, 3));
+
+    // Particle texture
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = 32;
+    pCanvas.height = 32;
+    const pCtx = pCanvas.getContext('2d');
     if (pCtx) {
-      const grad = pCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
-      grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(0.35, 'rgba(245,239,226,0.85)');
-      grad.addColorStop(0.8, 'rgba(245,239,226,0.15)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      pCtx.fillStyle = grad;
+      const g = pCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      g.addColorStop(0, 'rgba(255, 235, 180, 0.95)');
+      g.addColorStop(0.4, 'rgba(255, 180, 100, 0.4)');
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      pCtx.fillStyle = g;
       pCtx.fillRect(0, 0, 32, 32);
     }
-    const particleTex = new THREE.CanvasTexture(particleCanvas);
-
-    const particleMat = new THREE.PointsMaterial({
-      size: isMobile ? 1.2 : 1.6,
-      map: particleTex,
-      vertexColors: true,
+    const pTex = new THREE.CanvasTexture(pCanvas);
+    const sporeMat = new THREE.PointsMaterial({
+      size: 0.65,
+      map: pTex,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
+    const sporePoints = new THREE.Points(sporeGeo, sporeMat);
+    scene.add(sporePoints);
 
-    const particleSystem = new THREE.Points(particleGeo, particleMat);
-    scene.add(particleSystem);
-
-    // 6. Navigation, Camera Movement & Mouse Interaction
+    // 6. Mouse Interaction & Camera Control
     const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
-    const mouse3D = new THREE.Vector3(0, 0, 0);
-    const raycaster = new THREE.Raycaster();
-    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-    let cameraProgress = 0; // Along Z path
-    let cameraVelocity = 0.28; // Constant gentle forward drift
-    let userScrollDelta = 0;
-    let touchStartY = 0;
+    let scrollOffset = 0;
 
     const onMouseMove = (e: MouseEvent) => {
       mouse.targetX = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
-
-      // Project mouse into 3D world for flower excitement
-      raycaster.setFromCamera(new THREE.Vector2(mouse.targetX, mouse.targetY), camera);
-      const hit = new THREE.Vector3();
-      if (raycaster.ray.intersectPlane(groundPlane, hit)) {
-        mouse3D.copy(hit);
-      }
     };
 
-    const onWheel = (e: WheelEvent) => {
-      // Natural smooth wheel wandering
-      userScrollDelta += e.deltaY * 0.055;
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        touchStartY = e.touches[0].clientY;
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        const delta = touchStartY - e.touches[0].clientY;
-        touchStartY = e.touches[0].clientY;
-        userScrollDelta += delta * 0.09;
-      }
+    const onScroll = () => {
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      scrollOffset = window.scrollY / maxScroll;
     };
 
     const onResize = () => {
@@ -349,170 +470,112 @@ export const ValleyScene: React.FC<ValleySceneProps> = ({
     };
 
     window.addEventListener('mousemove', onMouseMove, { passive: true });
-    window.addEventListener('wheel', onWheel, { passive: true });
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
 
-    // Initial signal that scene setup is complete
     onLoaded?.();
 
-    // 7. Animation Loop
-    let clock = new THREE.Clock();
-    let ctaDisperseBurst = 0;
+    // 7. Animation Loop with Gentle Flower Swaying
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      const delta = Math.min(clock.getDelta(), 0.1);
-      const elapsedTime = clock.getElapsedTime();
+      const elapsed = clock.getElapsedTime();
 
-      // Smooth mouse damping
-      mouse.x += (mouse.targetX - mouse.x) * 0.05;
-      mouse.y += (mouse.targetY - mouse.y) * 0.05;
+      // Mouse damping
+      mouse.x += (mouse.targetX - mouse.x) * 0.04;
+      mouse.y += (mouse.targetY - mouse.y) * 0.04;
 
-      // CTA hover behavior: Ease camera drift to stop, trigger spore burst
-      const isHovered = isCtaHoveredRef.current;
-      const targetSpeed = isHovered ? 0.02 : 0.28;
-      cameraVelocity += (targetSpeed - cameraVelocity) * 0.06;
+      // Camera coordinates: slow drift + mouse tilt + scroll push
+      const targetCamZ = 12 - scrollOffset * 8;
+      const targetCamY = 3.0 + mouse.y * 0.8 - scrollOffset * 1.5;
+      const targetCamX = mouse.x * 2.2;
 
-      // Handle user scroll inertia
-      cameraProgress += cameraVelocity + userScrollDelta;
-      userScrollDelta *= 0.88; // Friction damping
+      camera.position.x += (targetCamX - camera.position.x) * 0.05;
+      camera.position.y += (targetCamY - camera.position.y) * 0.05;
+      camera.position.z += (targetCamZ - camera.position.z) * 0.05;
 
-      // Loop path seamlessly
-      if (cameraProgress > 420) {
-        cameraProgress = 0;
-      } else if (cameraProgress < 0) {
-        cameraProgress = 420;
-      }
+      // Look toward the archway center
+      camera.lookAt(mouse.x * 0.8, 2.8 + mouse.y * 0.3, -12);
 
-      // Camera coordinates along winding valley path
-      const camZ = -cameraProgress + 15;
-      const camX = Math.sin(cameraProgress * 0.018) * 8 + mouse.x * 3.5;
-      const terrainHeightAtCam = terrainElevation(camX, camZ - 180);
-      const camY = Math.max(terrainHeightAtCam + 5.5, 4.8) + mouse.y * 1.5;
+      // Subtle flower sway animation
+      const swayWind = Math.sin(elapsed * 1.5) * 0.06;
 
-      camera.position.x += (camX - camera.position.x) * 0.08;
-      camera.position.y += (camY - camera.position.y) * 0.08;
-      camera.position.z += (camZ - camera.position.z) * 0.08;
-
-      // Look slightly ahead along valley curvature
-      const lookAtZ = camera.position.z - 38;
-      const lookAtX = Math.sin((cameraProgress + 38) * 0.018) * 10 + mouse.x * 5.0;
-      const lookAtY = terrainElevation(lookAtX, lookAtZ - 180) + 4.0 - mouse.y * 2.0;
-
-      camera.lookAt(lookAtX, lookAtY, lookAtZ);
-
-      // Camera lantern tracks camera position
-      cameraLantern.position.copy(camera.position);
-
-      // Animate flowers: Blooming as camera approaches + gentle sway + mouse excitation
-      let flowerMatrixNeedsUpdate = false;
-      const pAttr = particleGeo.attributes.position;
-      const pArr = pAttr.array as Float32Array;
-
-      // CTA particle dispersal burst
-      if (isHovered) {
-        ctaDisperseBurst = Math.min(ctaDisperseBurst + 0.04, 1.0);
-      } else {
-        ctaDisperseBurst = Math.max(ctaDisperseBurst - 0.03, 0);
-      }
-
-      // Update flowers
-      for (let i = 0; i < FLOWER_COUNT; i++) {
-        const f = flowers[i];
-        const distToCam = Math.hypot(f.baseX - camera.position.x, f.baseZ - camera.position.z);
-
-        // Flower blooms as camera approaches (within 45 units)
-        const bloomThreshold = 52;
-        let targetScale = f.baseScale * 0.25;
-        if (distToCam < bloomThreshold) {
-          const bloomFactor = Math.pow(1 - distToCam / bloomThreshold, 1.4);
-          targetScale = f.baseScale * (0.25 + bloomFactor * 0.95);
-        }
-
-        // Mouse proximity excitation: flowers near cursor glow and tilt slightly
-        const distToMouse = Math.hypot(f.baseX - mouse3D.x, f.baseZ - mouse3D.z);
-        if (distToMouse < 8.5) {
-          targetScale *= 1.25;
-        }
-
-        f.currentScale += (targetScale - f.currentScale) * 0.1;
-
-        // Subtle ambient breeze sway
-        const sway = Math.sin(elapsedTime * 1.8 + f.baseX * 0.2 + f.baseZ * 0.3) * 0.08;
-
-        dummy.position.set(f.baseX, f.baseY, f.baseZ);
-        dummy.rotation.set(f.tiltX + sway, f.rotationY, f.tiltZ + sway);
-        dummy.scale.setScalar(f.currentScale);
+      // Animate Roses
+      for (let i = 0; i < ROSE_COUNT; i++) {
+        const r = roseInstances[i];
+        const indSway = Math.sin(elapsed * r.swaySpeed + r.x * 0.5) * 0.08;
+        dummy.position.set(r.x, r.y, r.z);
+        dummy.rotation.set(r.rotX + indSway, r.rotY, r.rotZ + swayWind);
+        dummy.scale.setScalar(r.scale);
         dummy.updateMatrix();
-
-        blossomInstanced.setMatrixAt(i, dummy.matrix);
-        centerInstanced.setMatrixAt(i, dummy.matrix);
-        flowerMatrixNeedsUpdate = true;
+        roseMesh.setMatrixAt(i, dummy.matrix);
       }
+      roseMesh.instanceMatrix.needsUpdate = true;
 
-      if (flowerMatrixNeedsUpdate) {
-        blossomInstanced.instanceMatrix.needsUpdate = true;
-        centerInstanced.instanceMatrix.needsUpdate = true;
+      // Animate Tulips
+      for (let i = 0; i < TULIP_COUNT; i++) {
+        const t = tulipInstances[i];
+        const indSway = Math.sin(elapsed * t.swaySpeed + t.z * 0.4) * 0.07;
+        dummy.position.set(t.x, t.y, t.z);
+        dummy.rotation.set(t.rotX + indSway, t.rotY, t.rotZ + swayWind * 0.8);
+        dummy.scale.setScalar(t.scale);
+        dummy.updateMatrix();
+        tulipMesh.setMatrixAt(i, dummy.matrix);
       }
+      tulipMesh.instanceMatrix.needsUpdate = true;
 
-      // Animate atmospheric particles / spores
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const i3 = i * 3;
-
-        // Upward gentle drift with wind turbulence
-        pArr[i3] += Math.sin(elapsedTime * 0.5 + pArr[i3 + 1] * 0.2) * 0.02;
-        pArr[i3 + 1] += particleVelocities[i3 + 1];
-        pArr[i3 + 2] += Math.cos(elapsedTime * 0.4 + pArr[i3] * 0.2) * 0.02;
-
-        // When CTA is hovered, disperse particles radially outward
-        if (ctaDisperseBurst > 0) {
-          const dx = pArr[i3] - camera.position.x;
-          const dy = pArr[i3 + 1] - camera.position.y;
-          const dz = pArr[i3 + 2] - (camera.position.z - 15);
-          const dist = Math.hypot(dx, dy, dz) + 0.1;
-          pArr[i3] += (dx / dist) * ctaDisperseBurst * 0.35;
-          pArr[i3 + 1] += (dy / dist) * ctaDisperseBurst * 0.35;
-          pArr[i3 + 2] += (dz / dist) * ctaDisperseBurst * 0.35;
-        }
-
-        // Recycle particles that drift too high or too far behind camera
-        if (pArr[i3 + 1] > 26) {
-          pArr[i3 + 1] = 1;
-        }
-        if (pArr[i3 + 2] > camera.position.z + 10) {
-          pArr[i3 + 2] = camera.position.z - 450;
-        }
+      // Spore drift
+      const sPos = sporeGeo.attributes.position.array as Float32Array;
+      for (let i = 0; i < SPORE_COUNT; i++) {
+        const idx = i * 3;
+        sPos[idx + 1] += 0.008; // upward drift
+        sPos[idx] += Math.sin(elapsed * 0.8 + sPos[idx + 1]) * 0.008;
+        if (sPos[idx + 1] > 10) sPos[idx + 1] = 0.8;
       }
-      pAttr.needsUpdate = true;
+      sporeGeo.attributes.position.needsUpdate = true;
 
-      // Render frame
       renderer.render(scene, camera);
     };
 
     animate();
 
-    // 8. Cleanup on unmount
+    // 8. Cleanup
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('wheel', onWheel);
-      window.removeEventListener('touchstart', onTouchStart);
-      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
 
-      // Dispose geometries, materials and textures
-      terrainGeo.dispose();
-      terrainMat.dispose();
-      blossomGeo.dispose();
-      blossomMat.dispose();
-      centerGeo.dispose();
-      centerMat.dispose();
-      particleGeo.dispose();
-      particleMat.dispose();
-      particleTex.dispose();
+      pathGeo.dispose();
+      pathMat.dispose();
+      groundGeo.dispose();
+      groundMat.dispose();
+      columnGeo.dispose();
+      archTopGeo.dispose();
+      archMat.dispose();
+      lanternGeo.dispose();
+      lanternMat.dispose();
+
+      rosePetalGeo.dispose();
+      roseMat.dispose();
+      stemGeo.dispose();
+      stemMat.dispose();
+      tulipPetalGeo.dispose();
+      tulipMat.dispose();
+      daisyPetalGeo.dispose();
+      daisyMat.dispose();
+      daisyCenterGeo.dispose();
+      daisyCenterMat.dispose();
+      lavenderSpikeGeo.dispose();
+      lavenderMat.dispose();
+      leafGeo.dispose();
+      leafMat.dispose();
+
+      sporeGeo.dispose();
+      sporeMat.dispose();
+      pTex.dispose();
       renderer.dispose();
 
       if (container.contains(renderer.domElement)) {
@@ -525,12 +588,11 @@ export const ValleyScene: React.FC<ValleySceneProps> = ({
     <div className="absolute inset-0 z-0 h-full w-full overflow-hidden bg-black">
       <div ref={containerRef} className="h-full w-full" />
       {!webGlSupported && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#0a0515] via-[#050811] to-black">
-          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_40%,rgba(255,75,147,0.18),transparent_60%),radial-gradient(circle_at_80%_60%,rgba(142,68,173,0.18),transparent_50%)]" />
-          <div className="relative z-10 max-w-md rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md p-6">
-            <h3 className="font-antonio text-xl text-[#f5efe2] mb-2">BloomBox Night Valley</h3>
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#12071a] via-[#090b14] to-black">
+          <div className="relative z-10 max-w-md rounded-2xl border border-white/10 bg-black/70 backdrop-blur-md p-8">
+            <h3 className="font-antonio text-2xl text-[#f5efe2] mb-2">BloomBox Botanical Sanctuary</h3>
             <p className="text-xs text-[#f5efe2]/70 leading-relaxed">
-              Experience optimized for hardware acceleration. Wander through our curated shop catalog and order management portal.
+              Experience optimized for hardware acceleration. Explore our curated collections and order management portal below.
             </p>
           </div>
         </div>
